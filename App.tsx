@@ -19,8 +19,8 @@ import LogViewer from './components/tools/LogViewer';
 import SystemMonitor from './components/SystemMonitor';
 import CommandPalette, { CommandOption } from './components/CommandPalette';
 import ContextBar, { ContextDef } from './components/ContextBar';
-import ContextDock, { FilterType } from './components/ContextDock';
-import { Message, Task, WindowState } from './types';
+import ContextDock, { ViewMode } from './components/ContextDock';
+import { Message, Task, WindowState, AiThread } from './types';
 import { geminiService } from './services/geminiService';
 import { MOCK_TASKS, INITIAL_SYSTEM_INSTRUCTION, HUD_TOOLS } from './constants';
 import { useLiveSession } from './hooks/useLiveSession';
@@ -43,7 +43,8 @@ import {
   ChevronUp,
   Mic,
   MicOff,
-  Globe
+  Globe,
+  LayoutGrid
 } from 'lucide-react';
 
 const generateId = () => Math.random().toString(36).substring(2, 9);
@@ -56,25 +57,33 @@ const CONTEXTS: ContextDef[] = [
   { id: 'studio', label: 'VISUAL STUDIO', x: 1800, y: 1400, color: '#8b5cf6', icon: <Monitor size={18} /> },
 ];
 
+// Categorized Windows with 'type'
 const INITIAL_WINDOWS: WindowState[] = [
     // --- DEV CORE ---
-    { id: 'code', contextId: 'dev', title: 'Code Editor', x: 100, y: 100, w: 800, h: 600, zIndex: 10 },
-    { id: 'docs', contextId: 'dev', title: 'Documentation', x: 950, y: 100, w: 450, h: 600, zIndex: 9 },
-    { id: 'tasks', contextId: 'dev', title: 'Mission Control', x: 100, y: 750, w: 400, h: 400, zIndex: 10 },
+    { id: 'code', contextId: 'dev', type: 'editor', title: 'Code Editor', x: 100, y: 100, w: 800, h: 600, zIndex: 10 },
+    { id: 'docs', contextId: 'dev', type: 'editor', title: 'Documentation', x: 950, y: 100, w: 450, h: 600, zIndex: 9 },
+    { id: 'tasks', contextId: 'dev', type: 'terminal', title: 'Mission Control', x: 100, y: 750, w: 400, h: 400, zIndex: 10 },
 
     // --- BLUEPRINTS ---
-    { id: 'db', contextId: 'design', title: 'Schema Designer', x: 1800, y: 100, w: 700, h: 500, zIndex: 10 },
-    { id: 'arch', contextId: 'design', title: 'Architecture', x: 2550, y: 100, w: 700, h: 500, zIndex: 10 },
-    { id: 'git', contextId: 'design', title: 'Source Control', x: 1800, y: 650, w: 600, h: 450, zIndex: 10 },
+    { id: 'db', contextId: 'design', type: 'visual', title: 'Schema Designer', x: 1800, y: 100, w: 700, h: 500, zIndex: 10 },
+    { id: 'arch', contextId: 'design', type: 'visual', title: 'Architecture', x: 2550, y: 100, w: 700, h: 500, zIndex: 10 },
+    { id: 'git', contextId: 'design', type: 'terminal', title: 'Source Control', x: 1800, y: 650, w: 600, h: 450, zIndex: 10 },
 
     // --- SYSTEM OPS ---
-    { id: 'pipeline', contextId: 'ops', title: 'CI/CD Pipeline', x: 100, y: 1400, w: 800, h: 400, zIndex: 10 },
-    { id: 'process', contextId: 'ops', title: 'Process Dashboard', x: 950, y: 1400, w: 500, h: 400, zIndex: 10 },
-    { id: 'logs', contextId: 'ops', title: 'System Logs', x: 100, y: 1850, w: 800, h: 400, zIndex: 10 },
+    { id: 'pipeline', contextId: 'ops', type: 'terminal', title: 'CI/CD Pipeline', x: 100, y: 1400, w: 800, h: 400, zIndex: 10 },
+    { id: 'process', contextId: 'ops', type: 'terminal', title: 'Process Dashboard', x: 950, y: 1400, w: 500, h: 400, zIndex: 10 },
+    { id: 'logs', contextId: 'ops', type: 'terminal', title: 'System Logs', x: 100, y: 1850, w: 800, h: 400, zIndex: 10 },
 
     // --- VISUAL STUDIO ---
-    { id: 'ui', contextId: 'studio', title: 'UI Preview', x: 1800, y: 1400, w: 900, h: 600, zIndex: 11 },
-    { id: 'diff', contextId: 'studio', title: 'Diff Viewer', x: 2750, y: 1400, w: 600, h: 600, zIndex: 10 },
+    { id: 'ui', contextId: 'studio', type: 'visual', title: 'UI Preview', x: 1800, y: 1400, w: 900, h: 600, zIndex: 11 },
+    { id: 'diff', contextId: 'studio', type: 'editor', title: 'Diff Viewer', x: 2750, y: 1400, w: 600, h: 600, zIndex: 10 },
+];
+
+// Simulated active AI conversations
+const INITIAL_THREADS: AiThread[] = [
+    { id: 't1', targetId: 'code', topic: 'Refactoring API', messageCount: 3, isActive: true },
+    { id: 't2', targetId: 'pipeline', topic: 'Fixing Build Fail', messageCount: 5, isActive: true },
+    { id: 't3', targetId: 'db', topic: 'Schema Migration', messageCount: 1, isActive: true },
 ];
 
 const App: React.FC = () => {
@@ -86,8 +95,8 @@ const App: React.FC = () => {
   const [isCmdPaletteOpen, setIsCmdPaletteOpen] = useState(false);
   const [activeContextId, setActiveContextId] = useState<string>('dev');
   
-  // -- View Mode / Filter State --
-  const [activeFilter, setActiveFilter] = useState<FilterType>('all');
+  // -- View Mode --
+  const [activeView, setActiveView] = useState<ViewMode>('spatial');
 
   // -- Terminal State --
   const [isTerminalOpen, setIsTerminalOpen] = useState(false);
@@ -95,6 +104,7 @@ const App: React.FC = () => {
 
   // -- Window Management --
   const [windows, setWindows] = useState<WindowState[]>(INITIAL_WINDOWS);
+  const [activeThreads, setActiveThreads] = useState<AiThread[]>(INITIAL_THREADS);
 
   // -- Content State --
   const [messages, setMessages] = useState<Message[]>([
@@ -168,9 +178,9 @@ const App: React.FC = () => {
     };
   }, []);
 
-  // Update active context based on position (Only if in 'all' filter mode)
+  // Update active context based on position (Only if in 'spatial' mode)
   useEffect(() => {
-    if (activeFilter !== 'all') return;
+    if (activeView !== 'spatial') return;
 
     const centerX = (-panOffset.x) + (viewport.width / 2 / scale);
     const centerY = (-panOffset.y) + (viewport.height / 2 / scale);
@@ -201,7 +211,7 @@ const App: React.FC = () => {
     if (closest && closest.id !== activeContextId) {
         setActiveContextId(closest.id);
     }
-  }, [panOffset, scale, viewport, contextBounds, activeContextId, activeFilter]);
+  }, [panOffset, scale, viewport, contextBounds, activeContextId, activeView]);
 
   // -- Handlers --
   const handlePan = useCallback((delta: { x: number; y: number }) => {
@@ -236,6 +246,9 @@ const App: React.FC = () => {
   }, []);
 
   const handleContextSelect = useCallback((ctx: ContextDef) => {
+      // Force spatial view if using context bar
+      setActiveView('spatial');
+      
       const bounds = contextBounds[ctx.id];
       let targetX, targetY;
 
@@ -254,49 +267,6 @@ const App: React.FC = () => {
       setActiveContextId(ctx.id);
   }, [viewport, scale, contextBounds]);
 
-  const handleAutoLayout = useCallback(() => {
-      setWindows(INITIAL_WINDOWS);
-      setTimeout(() => {
-          const bounds = { x: 40, y: 60, w: 1400, h: 1100 };
-          const targetX = bounds.x + (bounds.w / 2);
-          const targetY = bounds.y + (bounds.h / 2);
-          const targetPanX = (viewport.width / 2 / scale) - targetX;
-          const targetPanY = (viewport.height / 2 / scale) - targetY;
-          setPanOffset({ x: targetPanX, y: targetPanY });
-          setActiveContextId('dev');
-      }, 0);
-  }, [viewport, scale]);
-
-  const handleVisualOverview = useCallback(() => {
-    // Zoom out to see everything (Expose mode)
-    // 1. Calculate bounding box of all windows
-    if (windows.length === 0) return;
-
-    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-    windows.forEach(w => {
-        if (w.x < minX) minX = w.x;
-        if (w.y < minY) minY = w.y;
-        if (w.x + w.w > maxX) maxX = w.x + w.w;
-        if (w.y + w.h > maxY) maxY = w.y + w.h;
-    });
-
-    const padding = 200;
-    const totalW = (maxX - minX) + padding * 2;
-    const totalH = (maxY - minY) + padding * 2;
-    const centerX = minX + (maxX - minX) / 2;
-    const centerY = minY + (maxY - minY) / 2;
-
-    const scaleW = viewport.width / totalW;
-    const scaleH = viewport.height / totalH;
-    const fitScale = Math.min(scaleW, scaleH, 1) * 0.9; // 90% fill
-
-    const targetPanX = (viewport.width / 2 / fitScale) - centerX;
-    const targetPanY = (viewport.height / 2 / fitScale) - centerY;
-
-    setScale(fitScale);
-    setPanOffset({ x: targetPanX, y: targetPanY });
-  }, [windows, viewport]);
-
   const focusWindow = useCallback((id: string) => {
       if (id === 'terminal') {
           setIsTerminalOpen(true);
@@ -305,11 +275,15 @@ const App: React.FC = () => {
       handleWindowSelect(id);
       const win = windows.find(w => w.id === id);
       if (win) {
-          const targetX = -win.x + (viewport.width/2/scale) - (win.w/2);
-          const targetY = -win.y + (viewport.height/2/scale) - (win.h/2);
-          setPanOffset({ x: targetX, y: targetY });
+          // If in grid mode, ensure we see it (might need to switch view or just center)
+          // For now, if focusing a window in spatial, pan to it.
+          if (activeView === 'spatial') {
+              const targetX = -win.x + (viewport.width/2/scale) - (win.w/2);
+              const targetY = -win.y + (viewport.height/2/scale) - (win.h/2);
+              setPanOffset({ x: targetX, y: targetY });
+          }
       }
-  }, [handleWindowSelect, windows, viewport, scale]);
+  }, [handleWindowSelect, windows, viewport, scale, activeView]);
 
   // -- Chat Logic --
   const handleTaskCreate = useCallback((partialTask: Partial<Task>): string => {
@@ -338,8 +312,6 @@ const App: React.FC = () => {
 
   // -- Tool Execution --
   const handleToolCall = useCallback(async (name: string, args: any): Promise<any> => {
-      console.log('Tool Executing:', name, args);
-      
       switch (name) {
           case 'change_context': {
               const ctxId = args.contextId;
@@ -376,30 +348,14 @@ const App: React.FC = () => {
   }, [handleContextSelect, focusWindow, handleTaskCreate, handleTaskComplete, windows]);
 
   const systemInstruction = useMemo(() => {
-     const contextList = CONTEXTS.map(c => `${c.label} (id: ${c.id})`).join(', ');
-     const windowList = windows.map(w => `${w.title} (id: ${w.id}) in ${w.contextId}`).join(', ');
-     const taskList = tasks.map(t => `[${t.id}] ${t.title} (${t.status})`).join(', ');
-     
      return `
 ${INITIAL_SYSTEM_INSTRUCTION}
-
 CURRENT HUD ENVIRONMENT:
-- Active Filter Scope: ${activeFilter.toUpperCase()}
-- Available Contexts: ${contextList}
-- Active Windows: ${windowList}
-- Active Tasks: ${taskList}
+- Active View Mode: ${activeView.toUpperCase()}
+`;
+  }, [activeView]);
 
-You can control the HUD using tools:
-- change_context(contextId)
-- focus_window(windowId)
-- create_task(title, priority)
-- complete_task(taskId)
-
-When the user asks to "go to" or "show" something, use the appropriate tool.
-     `;
-  }, [windows, tasks, activeFilter]);
-
-  // -- Voice Session (Hoisted) --
+  // -- Voice Session --
   const { connect: connectVoice, disconnect: disconnectVoice, isConnected: isVoiceConnected, transcripts, volume } = useLiveSession({
     onToolCall: handleToolCall,
     systemInstruction,
@@ -422,13 +378,7 @@ When the user asks to "go to" or "show" something, use the appropriate tool.
     setIsProcessing(true);
 
     try {
-      // Inject scope context if not 'all'
-      let contextText = text;
-      if (activeFilter !== 'all') {
-         contextText = `[SCOPE: ${activeFilter.toUpperCase()}] ${text}`;
-      }
-
-      const responseText = await geminiService.sendMessage(contextText, {
+      const responseText = await geminiService.sendMessage(text, {
         tasks,
         onTaskCreate: handleTaskCreate,
         onTaskComplete: handleTaskComplete
@@ -443,12 +393,7 @@ When the user asks to "go to" or "show" something, use the appropriate tool.
       setMessages(prev => [...prev, modelMsg]);
     } catch (error) {
       console.error(error);
-      setMessages(prev => [...prev, {
-        id: generateId(),
-        role: 'system',
-        content: "ERR: LINK_FAILURE",
-        timestamp: Date.now()
-      }]);
+      setMessages(prev => [...prev, { id: generateId(), role: 'system', content: "ERR: LINK_FAILURE", timestamp: Date.now() }]);
     } finally {
       setIsProcessing(false);
     }
@@ -471,43 +416,97 @@ When the user asks to "go to" or "show" something, use the appropriate tool.
     }
   };
 
-  // Determine which windows are dimmed based on active filter
-  const isWindowDimmed = (win: WindowState) => {
-    if (activeFilter === 'all') return false;
-    
-    if (activeFilter === 'dev') {
-        return !['code', 'docs', 'tasks', 'git'].includes(win.id);
-    }
-    if (activeFilter === 'ops') {
-        return !['pipeline', 'process', 'logs'].includes(win.id);
-    }
-    if (activeFilter === 'design') {
-        return !['db', 'arch', 'ui', 'diff'].includes(win.id);
-    }
-    return true;
+  // --- Tiling Layout Engine ---
+  // Calculates render props based on active view mode
+  const getRenderWindowProps = (win: WindowState) => {
+      if (activeView === 'spatial') {
+          // In spatial mode, use the window's actual coordinates
+          return {
+              x: win.x,
+              y: win.y,
+              w: win.w,
+              h: win.h,
+              opacity: 1,
+              pointerEvents: 'auto'
+          };
+      }
+
+      // Check if window matches the current grid filter
+      let matchesFilter = false;
+      if (activeView === 'terminals' && win.type === 'terminal') matchesFilter = true;
+      if (activeView === 'editors' && win.type === 'editor') matchesFilter = true;
+      if (activeView === 'visuals' && win.type === 'visual') matchesFilter = true;
+
+      if (!matchesFilter) {
+          // Dim and disable non-matching windows in grid mode
+          return {
+              x: win.x,
+              y: win.y,
+              w: win.w,
+              h: win.h,
+              opacity: 0.1,
+              pointerEvents: 'none'
+          };
+      }
+
+      // Grid Layout Logic
+      // 1. Find all matching windows
+      const matchingWindows = windows.filter(w => {
+          if (activeView === 'terminals') return w.type === 'terminal';
+          if (activeView === 'editors') return w.type === 'editor';
+          if (activeView === 'visuals') return w.type === 'visual';
+          return false;
+      });
+
+      // 2. Determine index
+      const index = matchingWindows.findIndex(w => w.id === win.id);
+      
+      // 3. Calculate grid position (centered in viewport)
+      // Viewport center in World Space
+      const vpCenterX = (-panOffset.x) + (viewport.width / 2 / scale);
+      const vpCenterY = (-panOffset.y) + (viewport.height / 2 / scale);
+
+      const gap = 40;
+      const cols = Math.ceil(Math.sqrt(matchingWindows.length));
+      const rows = Math.ceil(matchingWindows.length / cols);
+      
+      const gridW = 700; // Fixed width for uniformity in grid
+      const gridH = 500;
+      
+      const totalW = (cols * gridW) + ((cols - 1) * gap);
+      const totalH = (rows * gridH) + ((rows - 1) * gap);
+      
+      const startX = vpCenterX - (totalW / 2);
+      const startY = vpCenterY - (totalH / 2);
+      
+      const col = index % cols;
+      const row = Math.floor(index / cols);
+
+      return {
+          x: startX + (col * (gridW + gap)),
+          y: startY + (row * (gridH + gap)),
+          w: gridW,
+          h: gridH,
+          opacity: 1,
+          pointerEvents: 'auto'
+      };
   };
 
-  // -- Command Options --
+  const handleAutoLayout = useCallback(() => {
+    setPanOffset({ x: 0, y: 0 });
+    setScale(0.8);
+    setActiveContextId('dev');
+  }, []);
+
   const commandList: CommandOption[] = [
     { id: 'toggle-term', label: 'Toggle Terminal', action: () => setIsTerminalOpen(p => !p), icon: <Terminal size={16} />, shortcut: 'Ctrl+`' },
     { id: 'toggle-voice', label: 'Toggle Voice Mode', action: toggleVoice, icon: <Mic size={16} /> },
-    { id: 'reset', label: 'Reset View', action: handleAutoLayout, icon: <LayoutTemplate size={16} />, shortcut: '⌘R' },
-    { id: 'visual-mode', label: 'Visual Overview', action: handleVisualOverview, icon: <Layout size={16} /> },
-    
-    // Filters
-    { id: 'filter-all', label: 'Filter: All (Spatial)', action: () => setActiveFilter('all'), icon: <Globe size={16} /> },
-    { id: 'filter-dev', label: 'Filter: Dev Stream', action: () => setActiveFilter('dev'), icon: <Code2 size={16} /> },
-    { id: 'filter-ops', label: 'Filter: Ops Command', action: () => setActiveFilter('ops'), icon: <Cpu size={16} /> },
-    { id: 'filter-design', label: 'Filter: Design Lab', action: () => setActiveFilter('design'), icon: <PenTool size={16} /> },
-
-    // Windows
-    { id: 'focus-code', label: 'Focus Code Editor', action: () => focusWindow('code'), icon: <Code size={16} /> },
-    { id: 'focus-tasks', label: 'Focus Mission Control', action: () => focusWindow('tasks'), icon: <Layout size={16} /> },
-    { id: 'focus-db', label: 'Focus Schema Designer', action: () => focusWindow('db'), icon: <Database size={16} /> },
-    { id: 'focus-pipeline', label: 'Focus CI/CD Pipeline', action: () => focusWindow('pipeline'), icon: <Workflow size={16} /> },
+    { id: 'reset', label: 'Reset Spatial View', action: () => { setActiveView('spatial'); handleAutoLayout(); }, icon: <Globe size={16} />, shortcut: '⌘R' },
+    { id: 'view-term', label: 'View: Terminal Grid', action: () => setActiveView('terminals'), icon: <Terminal size={16} /> },
+    { id: 'view-code', label: 'View: Editor Grid', action: () => setActiveView('editors'), icon: <Code size={16} /> },
+    { id: 'view-vis', label: 'View: Visual Grid', action: () => setActiveView('visuals'), icon: <LayoutGrid size={16} /> },
   ];
 
-  // Compact Mode Logic
   const isCompactMode = isTerminalOpen || isVoiceConnected;
 
   return (
@@ -516,24 +515,24 @@ When the user asks to "go to" or "show" something, use the appropriate tool.
       scale={scale} 
       onPan={handlePan} 
       onZoom={handleZoom}
-      // -- HUD LAYER (Fixed positioning) --
+      // -- HUD LAYER --
       hud={
         <>
-           {/* Top Context Bar - Still useful for quick jumps in Spatial Mode */}
+           {/* Context Bar (Top) */}
            <ContextBar 
               contexts={CONTEXTS} 
               activeContextId={activeContextId} 
               onSelect={handleContextSelect} 
            />
 
-           {/* New Sidebar Navigation */}
+           {/* View Mode Switcher (Left Dock) */}
            <ContextDock 
-              activeFilter={activeFilter}
-              onSelectFilter={setActiveFilter}
-              onVisualOverview={handleVisualOverview}
+              activeView={activeView}
+              onSelectView={setActiveView}
+              activeThreads={activeThreads}
            />
 
-           {/* Minimap - Hidden in Compact Mode */}
+           {/* Minimap */}
            {!isCompactMode && (
              <div 
                 className="fixed left-8 bottom-8 pointer-events-auto shadow-2xl border border-neutral-800 bg-black z-50 transition-all duration-300 ease-in-out"
@@ -563,50 +562,34 @@ When the user asks to "go to" or "show" something, use the appropriate tool.
                 </div>
            </div>
 
-           {/* Status Controls (Toolbar) */}
+           {/* Controls */}
            {!isCompactMode && (
-             <div 
-                className="fixed right-8 bottom-8 flex flex-col items-end pointer-events-none z-50 transition-all duration-300 ease-in-out"
-             >
+             <div className="fixed right-8 bottom-8 flex flex-col items-end pointer-events-none z-50 transition-all duration-300 ease-in-out">
                 <div className="pointer-events-auto flex items-center gap-2">
                     <div className="flex bg-black/80 backdrop-blur-sm border border-neutral-800 rounded overflow-hidden shadow-xl items-center h-8">
-                        {/* Search / Command */}
                         <button 
                           onClick={() => setIsCmdPaletteOpen(true)}
                           className="flex items-center gap-2 px-3 h-full hover:bg-neutral-800 text-neutral-400 hover:text-white transition-colors border-r border-neutral-800"
-                          title="Command Palette (Cmd+K)"
                         >
                            <Search size={14} />
                            <span className="text-[10px] font-mono font-bold hidden sm:inline">CMD+K</span>
                         </button>
-
-                        {/* Global Voice Toggle */}
                         <button 
                           onClick={toggleVoice}
                           className={`w-10 h-full flex items-center justify-center transition-colors border-r border-neutral-800 ${
-                              isVoiceConnected 
-                                ? 'bg-emerald-900/30 text-emerald-500 animate-pulse' 
-                                : 'hover:bg-neutral-800 text-neutral-400 hover:text-white'
+                              isVoiceConnected ? 'bg-emerald-900/30 text-emerald-500 animate-pulse' : 'hover:bg-neutral-800 text-neutral-400 hover:text-white'
                           }`}
-                          title={isVoiceConnected ? "Disconnect Voice" : "Enable Voice Link"}
                         >
                            {isVoiceConnected ? <Mic size={14} /> : <MicOff size={14} />}
-                           {isVoiceConnected && (
-                              <div className="absolute top-1 right-1 w-1.5 h-1.5 bg-emerald-500 rounded-full animate-ping" />
-                           )}
                         </button>
-
-                        {/* Terminal Toggle */}
                         <button 
                           onClick={() => setIsTerminalOpen(p => !p)}
                           className={`w-10 h-full flex items-center justify-center transition-colors border-r border-neutral-800 ${
                               isTerminalOpen ? 'bg-neutral-800 text-white' : 'hover:bg-neutral-800 text-neutral-400 hover:text-white'
                           }`}
-                          title="Toggle Terminal (Ctrl+`)"
                         >
                            {isTerminalOpen ? <ChevronUp size={14} className="rotate-180" /> : <Terminal size={14} />}
                         </button>
-
                         <button onClick={() => setScale(s => Math.max(0.2, s - 0.2))} className="w-8 h-full flex items-center justify-center hover:bg-neutral-800 text-neutral-400 hover:text-white transition-colors border-r border-neutral-800"><ZoomOut size={14} /></button>
                         <button onClick={() => setScale(s => Math.min(3, s + 0.2))} className="w-8 h-full flex items-center justify-center hover:bg-neutral-800 text-neutral-400 hover:text-white transition-colors"><ZoomIn size={14} /></button>
                     </div>
@@ -621,7 +604,7 @@ When the user asks to "go to" or "show" something, use the appropriate tool.
               onToggleMaximize={() => setIsTerminalMaximized(p => !p)}
               isMaximized={isTerminalMaximized}
               activeContextLabel={CONTEXTS.find(c => c.id === activeContextId)?.label}
-              activeScope={activeFilter.toUpperCase()}
+              activeScope={activeView.toUpperCase()}
            >
               <ChatInterface 
                 messages={messages} 
@@ -630,11 +613,11 @@ When the user asks to "go to" or "show" something, use the appropriate tool.
                 isConnected={isVoiceConnected}
                 transcripts={transcripts}
                 isActive={isTerminalOpen}
-                activeScope={activeFilter.toUpperCase()}
+                activeScope={activeView.toUpperCase()}
               />
            </TerminalDrawer>
 
-           {/* Bottom Status Bar */}
+           {/* Status Bar */}
            <StatusBar 
               panOffset={panOffset} 
               scale={scale} 
@@ -646,7 +629,6 @@ When the user asks to "go to" or "show" something, use the appropriate tool.
               isTerminalOpen={isTerminalOpen}
            />
 
-           {/* Command Palette */}
            <CommandPalette 
               isOpen={isCmdPaletteOpen} 
               onClose={() => setIsCmdPaletteOpen(false)} 
@@ -655,68 +637,44 @@ When the user asks to "go to" or "show" something, use the appropriate tool.
         </>
       }
     >
-        {/* -- WORLD LAYER (Scaled content) -- */}
-
-        {/* Dynamic Context Borders */}
-        {CONTEXTS.map(ctx => {
-            const bounds = contextBounds[ctx.id];
-            if (!bounds) return null;
+        {/* -- WORLD LAYER -- */}
+        
+        {/* Render Windows using the layout engine */}
+        {windows.map(win => {
+            const renderProps = getRenderWindowProps(win);
+            const activeThread = activeThreads.find(t => t.targetId === win.id && t.isActive);
 
             return (
-                <div 
-                    key={ctx.id}
-                    className="absolute border transition-colors duration-300 pointer-events-none rounded-lg"
-                    style={{
-                        left: bounds.x + panOffset.x, 
-                        top: bounds.y + panOffset.y,
-                        width: bounds.w,
-                        height: bounds.h,
-                        borderColor: ctx.id === activeContextId ? ctx.color : '#262626',
-                        borderWidth: '1px',
-                        backgroundColor: ctx.id === activeContextId ? `${ctx.color}05` : 'transparent',
-                        boxShadow: ctx.id === activeContextId ? `0 0 100px ${ctx.color}10` : 'none',
-                        // Dim borders if not in all mode
-                        opacity: activeFilter === 'all' ? 1 : 0.1
-                    }}
+                <DraggableWindow
+                    key={win.id}
+                    {...win} // pass original props (id, title, etc)
+                    // Override spatial props with calculated ones
+                    x={renderProps.x}
+                    y={renderProps.y}
+                    w={renderProps.w}
+                    h={renderProps.h}
+                    panOffset={panOffset}
+                    scale={scale}
+                    isSelected={selectedWindowId === win.id}
+                    isDimmed={renderProps.opacity < 1} // Logic for dimmed check
+                    aiThread={activeThread} // Pass thread for bubble
+                    onMove={handleWindowMove}
+                    onResize={handleWindowResize}
+                    onSelect={handleWindowSelect}
+                    className={'bg-black border border-neutral-700 shadow-2xl flex flex-col'}
                 >
-                    <div 
-                        className="absolute top-0 left-4 px-3 py-1 text-[10px] font-bold tracking-[0.2em] -translate-y-1/2 rounded-full border bg-black shadow-lg"
-                        style={{ 
-                            color: ctx.id === activeContextId ? ctx.color : '#525252',
-                            borderColor: ctx.id === activeContextId ? ctx.color : '#262626'
-                        }}
-                    >
-                        {ctx.label}
+                    <div className="h-6 bg-neutral-900 border-b border-neutral-800 flex items-center justify-between px-2 select-none shrink-0">
+                        <span className="text-[10px] font-bold tracking-widest text-neutral-500 uppercase">{win.title}</span>
+                        <div className="flex gap-1">
+                            <div className="w-1.5 h-1.5 rounded-full bg-neutral-700 hover:bg-red-500/50 transition-colors"></div>
+                        </div>
                     </div>
-                </div>
+                    <div className="flex-1 min-h-0 overflow-hidden relative">
+                        {renderWindowContent(win.id)}
+                    </div>
+                </DraggableWindow>
             );
         })}
-
-        {/* Windows */}
-        {windows.map(win => (
-            <DraggableWindow
-                key={win.id}
-                {...win}
-                panOffset={panOffset}
-                scale={scale}
-                isSelected={selectedWindowId === win.id}
-                isDimmed={isWindowDimmed(win)}
-                onMove={handleWindowMove}
-                onResize={handleWindowResize}
-                onSelect={handleWindowSelect}
-                className={'bg-black border border-neutral-700 shadow-2xl flex flex-col'}
-            >
-                <div className="h-6 bg-neutral-900 border-b border-neutral-800 flex items-center justify-between px-2 select-none shrink-0">
-                    <span className="text-[10px] font-bold tracking-widest text-neutral-500 uppercase">{win.title}</span>
-                    <div className="flex gap-1">
-                        <div className="w-1.5 h-1.5 rounded-full bg-neutral-700 hover:bg-red-500/50 transition-colors"></div>
-                    </div>
-                </div>
-                <div className="flex-1 min-h-0 overflow-hidden relative">
-                    {renderWindowContent(win.id)}
-                </div>
-            </DraggableWindow>
-        ))}
 
     </HUDFrame>
   );

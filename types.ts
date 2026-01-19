@@ -28,13 +28,24 @@ export enum Tab {
   SYSTEM = 'SYSTEM'
 }
 
+export type WindowType = 'editor' | 'terminal' | 'visual' | 'system';
+
 export interface WindowState {
   id: string;
   contextId?: string;
+  type: WindowType; // Added for Tiling
   x: number;
   y: number;
   w: number;
   h: number;
   zIndex: number;
   title: string;
+}
+
+export interface AiThread {
+  id: string;
+  targetId: string; // Window ID or Context ID
+  topic: string;
+  messageCount: number;
+  isActive: boolean;
 }

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { MessageCircle, Sparkles } from 'lucide-react';
 
 interface DraggableWindowProps {
   id: string;
@@ -11,7 +12,8 @@ interface DraggableWindowProps {
   scale: number;
   zIndex: number;
   isSelected: boolean;
-  isDimmed?: boolean; // New Prop
+  isDimmed?: boolean;
+  aiThread?: { topic: string; messageCount: number }; // New Prop for AI Bubble
   onMove: (id: string, x: number, y: number) => void;
   onResize: (id: string, w: number, h: number) => void;
   onSelect: (id: string) => void;
@@ -30,6 +32,7 @@ const DraggableWindow: React.FC<DraggableWindowProps> = ({
   zIndex, 
   isSelected,
   isDimmed = false,
+  aiThread,
   onMove, 
   onResize,
   onSelect,
@@ -118,15 +121,15 @@ const DraggableWindow: React.FC<DraggableWindowProps> = ({
         // Visual styling for dimmed state
         opacity: isDimmed ? 0.3 : 1,
         filter: isDimmed ? 'grayscale(100%) blur(1px)' : 'none',
-        transition: 'opacity 0.3s ease, filter 0.3s ease',
-        pointerEvents: isDimmed ? 'none' : 'auto' // Prevent interaction when dimmed
+        transition: 'all 0.4s cubic-bezier(0.16, 1, 0.3, 1)', // Smoother transition for grid/spatial switching
+        pointerEvents: isDimmed ? 'none' : 'auto' 
       }}
       className={`
         flex flex-col
         ${isDragging ? 'cursor-grabbing' : ''} 
         ${className}
       `}
-      onMouseDown={handleContentMouseDown} // Capture selection clicks
+      onMouseDown={handleContentMouseDown} 
     >
       {/* Selection Border / Glow */}
       <div className={`absolute -inset-[3px] pointer-events-none transition-opacity duration-300 ${isSelected && !isDimmed ? 'opacity-100' : 'opacity-0'}`}>
@@ -137,6 +140,24 @@ const DraggableWindow: React.FC<DraggableWindowProps> = ({
          <div className="absolute bottom-0 left-0 w-3 h-3 border-b-2 border-l-2 border-emerald-400"></div>
          <div className="absolute bottom-0 right-0 w-3 h-3 border-b-2 border-r-2 border-emerald-400"></div>
       </div>
+
+      {/* AI Activity Badge (Floating above window) */}
+      {aiThread && !isDimmed && (
+          <div className="absolute -top-10 left-4 z-50 flex items-center gap-2 animate-in slide-in-from-bottom-2 duration-500">
+              <div className="bg-emerald-950/90 border border-emerald-500/50 text-emerald-100 text-[10px] px-3 py-1.5 rounded-full shadow-lg backdrop-blur-md flex items-center gap-2">
+                  <div className="relative">
+                      <MessageCircle size={12} className="text-emerald-400" />
+                      <span className="absolute -top-1 -right-1 flex h-2 w-2">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                      </span>
+                  </div>
+                  <span className="font-bold tracking-wide max-w-[120px] truncate">{aiThread.topic}</span>
+              </div>
+              {/* Connecting Line */}
+              <div className="h-4 w-px bg-emerald-500/50 absolute left-4 top-full"></div>
+          </div>
+      )}
 
       {/* DRAG HANDLE */}
       <div 
