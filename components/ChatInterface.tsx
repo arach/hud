@@ -16,6 +16,7 @@ interface ChatInterfaceProps {
   // Voice Props
   isConnected: boolean;
   transcripts: Transcript[];
+  onRequireAuth?: () => boolean;
 }
 
 const ChatInterface: React.FC<ChatInterfaceProps> = ({ 
@@ -23,7 +24,8 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   onSendMessage, 
   isLoading, 
   isConnected,
-  transcripts
+  transcripts,
+  onRequireAuth
 }) => {
   const [input, setInput] = React.useState('');
   const scrollRef = useRef<HTMLDivElement>(null);

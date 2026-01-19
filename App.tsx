@@ -45,7 +45,10 @@ import {
   MicOff
 } from 'lucide-react';
 
+import ApiKeyModal from './components/ApiKeyModal';
+
 const generateId = () => Math.random().toString(36).substring(2, 9);
+
 
 // -- Context Definitions --
 // Compacted layout coordinates for better centering on laptop screens
@@ -89,6 +92,9 @@ const App: React.FC = () => {
   // -- Terminal State --
   const [isTerminalOpen, setIsTerminalOpen] = useState(false);
   const [isTerminalMaximized, setIsTerminalMaximized] = useState(false);
+
+  const [hasApiKey, setHasApiKey] = useState(false);
+  const [isApiKeyModalOpen, setIsApiKeyModalOpen] = useState(false);
 
   // -- Window Management --
   const [windows, setWindows] = useState<WindowState[]>(INITIAL_WINDOWS);
@@ -137,11 +143,29 @@ const App: React.FC = () => {
 
   // -- Effects --
   useEffect(() => {
+    // Check for API Key on mount
+    const storedKey = localStorage.getItem('GEMINI_API_KEY');
+    const envKey = process.env.API_KEY;
+    
+    if (storedKey || envKey) {
+        setHasApiKey(true);
+        // Ensure service is initialized if using stored key
+        if (storedKey && !geminiService.isConfigured()) {
+            geminiService.initialize(storedKey);
+        }
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!hasApiKey) return;
+
     geminiService.startChat(messages.slice(1).map(m => ({
         role: m.role,
         parts: [{ text: m.content }]
     })));
+  }, [hasApiKey, messages]); // Added messages dependency to ensure correct history on init if messages change
 
+  useEffect(() => {
     const handleResize = () => {
         setViewport({ width: window.innerWidth, height: window.innerHeight });
     };
@@ -308,6 +332,21 @@ const App: React.FC = () => {
       }, 0);
   }, [viewport, scale]);
 
+  const handleSaveKey = (key: string) => {
+    localStorage.setItem('GEMINI_API_KEY', key);
+    geminiService.initialize(key);
+    setHasApiKey(true);
+    setIsApiKeyModalOpen(false);
+  };
+  
+  const checkApiKey = useCallback(() => {
+      if (!hasApiKey) {
+          setIsApiKeyModalOpen(true);
+          return false;
+      }
+      return true;
+  }, [hasApiKey]);
+
   const focusWindow = useCallback((id: string) => {
       // Special handling for terminal which is now a drawer
       if (id === 'terminal') {
@@ -418,11 +457,14 @@ When the user asks to "go to" or "show" something, use the appropriate tool.
   });
 
   const toggleVoice = () => {
+      if (!checkApiKey()) return;
       if (isVoiceConnected) disconnectVoice();
       else connectVoice();
   };
 
   const handleSendMessage = async (text: string) => {
+    if (!checkApiKey()) return;
+
     const userMsg: Message = {
       id: generateId(),
       role: 'user',
@@ -504,6 +546,8 @@ When the user asks to "go to" or "show" something, use the appropriate tool.
   const hudBottomOffset = isTerminalOpen && !isTerminalMaximized ? '360px' : '32px';
 
   return (
+    <>
+    <ApiKeyModal isOpen={isApiKeyModalOpen} onSave={handleSaveKey} />
     <HUDFrame 
       panOffset={panOffset} 
       scale={scale} 
@@ -616,6 +660,7 @@ When the user asks to "go to" or "show" something, use the appropriate tool.
                 isLoading={isProcessing} 
                 isConnected={isVoiceConnected}
                 transcripts={transcripts}
+                onRequireAuth={checkApiKey}
               />
            </TerminalDrawer>
 
