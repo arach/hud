@@ -19,7 +19,7 @@ import LogViewer from './components/tools/LogViewer';
 import SystemMonitor from './components/SystemMonitor';
 import CommandPalette, { CommandOption } from './components/CommandPalette';
 import ContextBar, { ContextDef } from './components/ContextBar';
-import ContextDock from './components/ContextDock';
+import ContextDock, { FilterType } from './components/ContextDock';
 import { Message, Task, WindowState } from './types';
 import { geminiService } from './services/geminiService';
 import { MOCK_TASKS, INITIAL_SYSTEM_INSTRUCTION, HUD_TOOLS } from './constants';
@@ -42,13 +42,13 @@ import {
   Search,
   ChevronUp,
   Mic,
-  MicOff
+  MicOff,
+  Globe
 } from 'lucide-react';
 
 const generateId = () => Math.random().toString(36).substring(2, 9);
 
 // -- Context Definitions --
-// Compacted layout coordinates for better centering on laptop screens
 const CONTEXTS: ContextDef[] = [
   { id: 'dev', label: 'DEV CORE', x: 0, y: 0, color: '#10b981', icon: <Code2 size={18} /> },
   { id: 'design', label: 'BLUEPRINTS', x: 1800, y: 0, color: '#3b82f6', icon: <PenTool size={18} /> },
@@ -57,22 +57,22 @@ const CONTEXTS: ContextDef[] = [
 ];
 
 const INITIAL_WINDOWS: WindowState[] = [
-    // --- DEV CORE (Top Left) ---
+    // --- DEV CORE ---
     { id: 'code', contextId: 'dev', title: 'Code Editor', x: 100, y: 100, w: 800, h: 600, zIndex: 10 },
     { id: 'docs', contextId: 'dev', title: 'Documentation', x: 950, y: 100, w: 450, h: 600, zIndex: 9 },
     { id: 'tasks', contextId: 'dev', title: 'Mission Control', x: 100, y: 750, w: 400, h: 400, zIndex: 10 },
 
-    // --- BLUEPRINTS (Top Right) ---
+    // --- BLUEPRINTS ---
     { id: 'db', contextId: 'design', title: 'Schema Designer', x: 1800, y: 100, w: 700, h: 500, zIndex: 10 },
     { id: 'arch', contextId: 'design', title: 'Architecture', x: 2550, y: 100, w: 700, h: 500, zIndex: 10 },
     { id: 'git', contextId: 'design', title: 'Source Control', x: 1800, y: 650, w: 600, h: 450, zIndex: 10 },
 
-    // --- SYSTEM OPS (Bottom Left) ---
+    // --- SYSTEM OPS ---
     { id: 'pipeline', contextId: 'ops', title: 'CI/CD Pipeline', x: 100, y: 1400, w: 800, h: 400, zIndex: 10 },
     { id: 'process', contextId: 'ops', title: 'Process Dashboard', x: 950, y: 1400, w: 500, h: 400, zIndex: 10 },
     { id: 'logs', contextId: 'ops', title: 'System Logs', x: 100, y: 1850, w: 800, h: 400, zIndex: 10 },
 
-    // --- VISUAL STUDIO (Bottom Right) ---
+    // --- VISUAL STUDIO ---
     { id: 'ui', contextId: 'studio', title: 'UI Preview', x: 1800, y: 1400, w: 900, h: 600, zIndex: 11 },
     { id: 'diff', contextId: 'studio', title: 'Diff Viewer', x: 2750, y: 1400, w: 600, h: 600, zIndex: 10 },
 ];
@@ -86,6 +86,9 @@ const App: React.FC = () => {
   const [isCmdPaletteOpen, setIsCmdPaletteOpen] = useState(false);
   const [activeContextId, setActiveContextId] = useState<string>('dev');
   
+  // -- View Mode / Filter State --
+  const [activeFilter, setActiveFilter] = useState<FilterType>('all');
+
   // -- Terminal State --
   const [isTerminalOpen, setIsTerminalOpen] = useState(false);
   const [isTerminalMaximized, setIsTerminalMaximized] = useState(false);
@@ -165,8 +168,10 @@ const App: React.FC = () => {
     };
   }, []);
 
-  // Update active context based on position
+  // Update active context based on position (Only if in 'all' filter mode)
   useEffect(() => {
+    if (activeFilter !== 'all') return;
+
     const centerX = (-panOffset.x) + (viewport.width / 2 / scale);
     const centerY = (-panOffset.y) + (viewport.height / 2 / scale);
 
@@ -182,7 +187,6 @@ const App: React.FC = () => {
                 y: bounds.y + bounds.h / 2
             };
         }
-        // Fallback center for empty contexts
         return { id: ctx.id, x: ctx.x + 700, y: ctx.y + 400 }; 
     });
 
@@ -197,7 +201,7 @@ const App: React.FC = () => {
     if (closest && closest.id !== activeContextId) {
         setActiveContextId(closest.id);
     }
-  }, [panOffset, scale, viewport, contextBounds, activeContextId]);
+  }, [panOffset, scale, viewport, contextBounds, activeContextId, activeFilter]);
 
   // -- Handlers --
   const handlePan = useCallback((delta: { x: number; y: number }) => {
@@ -239,7 +243,6 @@ const App: React.FC = () => {
           targetX = bounds.x + (bounds.w / 2);
           targetY = bounds.y + (bounds.h / 2);
       } else {
-          // Compact fallback for empty contexts
           targetX = ctx.x + 700;
           targetY = ctx.y + 400;
       }
@@ -251,54 +254,10 @@ const App: React.FC = () => {
       setActiveContextId(ctx.id);
   }, [viewport, scale, contextBounds]);
 
-  const handleGatherContext = useCallback((contextId: string) => {
-     const centerX = (-panOffset.x) + (viewport.width / 2 / scale);
-     const centerY = (-panOffset.y) + (viewport.height / 2 / scale);
-
-     setWindows(prev => prev.map(win => {
-         if (win.contextId === contextId) {
-             const offsetX = (Math.random() * 200) - 100;
-             const offsetY = (Math.random() * 200) - 100;
-             return { ...win, x: centerX + offsetX - (win.w/2), y: centerY + offsetY - (win.h/2) };
-         }
-         return win;
-     }));
-  }, [panOffset, viewport, scale]);
-
-  const handleArrangeContext = useCallback((contextId: string) => {
-    setWindows(prev => {
-        const ctxWins = prev.filter(w => w.contextId === contextId);
-        const otherWins = prev.filter(w => w.contextId !== contextId);
-        
-        if (ctxWins.length === 0) return prev;
-
-        // Arrange relative to the current bounding box top-left, or viewport center if undefined
-        const currentBounds = contextBounds[contextId];
-        const startX = currentBounds ? currentBounds.x + 60 : (-panOffset.x) + (viewport.width / 2 / scale) - 400;
-        const startY = currentBounds ? currentBounds.y + 60 : (-panOffset.y) + (viewport.height / 2 / scale) - 300;
-        
-        const gap = 30;
-        const cols = Math.ceil(Math.sqrt(ctxWins.length));
-        
-        const arranged = ctxWins.map((w, i) => {
-            const col = i % cols;
-            const row = Math.floor(i / cols);
-            return {
-                ...w,
-                x: startX + (col * (w.w + gap)),
-                y: startY + (row * (w.h + gap))
-            };
-        });
-        
-        return [...otherWins, ...arranged];
-    });
-  }, [panOffset, viewport, scale, contextBounds]);
-
   const handleAutoLayout = useCallback(() => {
       setWindows(INITIAL_WINDOWS);
-      // Wait a tick for state update before centering
       setTimeout(() => {
-          const bounds = { x: 40, y: 60, w: 1400, h: 1100 }; // Approx bounds of Dev Core
+          const bounds = { x: 40, y: 60, w: 1400, h: 1100 };
           const targetX = bounds.x + (bounds.w / 2);
           const targetY = bounds.y + (bounds.h / 2);
           const targetPanX = (viewport.width / 2 / scale) - targetX;
@@ -308,8 +267,37 @@ const App: React.FC = () => {
       }, 0);
   }, [viewport, scale]);
 
+  const handleVisualOverview = useCallback(() => {
+    // Zoom out to see everything (Expose mode)
+    // 1. Calculate bounding box of all windows
+    if (windows.length === 0) return;
+
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    windows.forEach(w => {
+        if (w.x < minX) minX = w.x;
+        if (w.y < minY) minY = w.y;
+        if (w.x + w.w > maxX) maxX = w.x + w.w;
+        if (w.y + w.h > maxY) maxY = w.y + w.h;
+    });
+
+    const padding = 200;
+    const totalW = (maxX - minX) + padding * 2;
+    const totalH = (maxY - minY) + padding * 2;
+    const centerX = minX + (maxX - minX) / 2;
+    const centerY = minY + (maxY - minY) / 2;
+
+    const scaleW = viewport.width / totalW;
+    const scaleH = viewport.height / totalH;
+    const fitScale = Math.min(scaleW, scaleH, 1) * 0.9; // 90% fill
+
+    const targetPanX = (viewport.width / 2 / fitScale) - centerX;
+    const targetPanY = (viewport.height / 2 / fitScale) - centerY;
+
+    setScale(fitScale);
+    setPanOffset({ x: targetPanX, y: targetPanY });
+  }, [windows, viewport]);
+
   const focusWindow = useCallback((id: string) => {
-      // Special handling for terminal which is now a drawer
       if (id === 'terminal') {
           setIsTerminalOpen(true);
           return;
@@ -396,6 +384,7 @@ const App: React.FC = () => {
 ${INITIAL_SYSTEM_INSTRUCTION}
 
 CURRENT HUD ENVIRONMENT:
+- Active Filter Scope: ${activeFilter.toUpperCase()}
 - Available Contexts: ${contextList}
 - Active Windows: ${windowList}
 - Active Tasks: ${taskList}
@@ -408,7 +397,7 @@ You can control the HUD using tools:
 
 When the user asks to "go to" or "show" something, use the appropriate tool.
      `;
-  }, [windows, tasks]);
+  }, [windows, tasks, activeFilter]);
 
   // -- Voice Session (Hoisted) --
   const { connect: connectVoice, disconnect: disconnectVoice, isConnected: isVoiceConnected, transcripts, volume } = useLiveSession({
@@ -433,7 +422,13 @@ When the user asks to "go to" or "show" something, use the appropriate tool.
     setIsProcessing(true);
 
     try {
-      const responseText = await geminiService.sendMessage(text, {
+      // Inject scope context if not 'all'
+      let contextText = text;
+      if (activeFilter !== 'all') {
+         contextText = `[SCOPE: ${activeFilter.toUpperCase()}] ${text}`;
+      }
+
+      const responseText = await geminiService.sendMessage(contextText, {
         tasks,
         onTaskCreate: handleTaskCreate,
         onTaskComplete: handleTaskComplete
@@ -476,30 +471,43 @@ When the user asks to "go to" or "show" something, use the appropriate tool.
     }
   };
 
+  // Determine which windows are dimmed based on active filter
+  const isWindowDimmed = (win: WindowState) => {
+    if (activeFilter === 'all') return false;
+    
+    if (activeFilter === 'dev') {
+        return !['code', 'docs', 'tasks', 'git'].includes(win.id);
+    }
+    if (activeFilter === 'ops') {
+        return !['pipeline', 'process', 'logs'].includes(win.id);
+    }
+    if (activeFilter === 'design') {
+        return !['db', 'arch', 'ui', 'diff'].includes(win.id);
+    }
+    return true;
+  };
+
   // -- Command Options --
   const commandList: CommandOption[] = [
     { id: 'toggle-term', label: 'Toggle Terminal', action: () => setIsTerminalOpen(p => !p), icon: <Terminal size={16} />, shortcut: 'Ctrl+`' },
     { id: 'toggle-voice', label: 'Toggle Voice Mode', action: toggleVoice, icon: <Mic size={16} /> },
-    { id: 'reset', label: 'Auto Layout / Reset View', action: handleAutoLayout, icon: <LayoutTemplate size={16} />, shortcut: '⌘R' },
-    { id: 'zoom-in', label: 'Zoom In', action: () => setScale(s => Math.min(3, s + 0.2)), icon: <ZoomIn size={16} /> },
-    { id: 'zoom-out', label: 'Zoom Out', action: () => setScale(s => Math.max(0.2, s - 0.2)), icon: <ZoomOut size={16} /> },
+    { id: 'reset', label: 'Reset View', action: handleAutoLayout, icon: <LayoutTemplate size={16} />, shortcut: '⌘R' },
+    { id: 'visual-mode', label: 'Visual Overview', action: handleVisualOverview, icon: <Layout size={16} /> },
     
-    // Contexts
-    { id: 'ctx-dev', label: 'Switch to Dev Core', action: () => handleContextSelect(CONTEXTS[0]), icon: <Code2 size={16} /> },
-    { id: 'ctx-design', label: 'Switch to Blueprints', action: () => handleContextSelect(CONTEXTS[1]), icon: <PenTool size={16} /> },
-    { id: 'ctx-ops', label: 'Switch to System Ops', action: () => handleContextSelect(CONTEXTS[2]), icon: <Server size={16} /> },
-    { id: 'ctx-studio', label: 'Switch to Visual Studio', action: () => handleContextSelect(CONTEXTS[3]), icon: <Monitor size={16} /> },
+    // Filters
+    { id: 'filter-all', label: 'Filter: All (Spatial)', action: () => setActiveFilter('all'), icon: <Globe size={16} /> },
+    { id: 'filter-dev', label: 'Filter: Dev Stream', action: () => setActiveFilter('dev'), icon: <Code2 size={16} /> },
+    { id: 'filter-ops', label: 'Filter: Ops Command', action: () => setActiveFilter('ops'), icon: <Cpu size={16} /> },
+    { id: 'filter-design', label: 'Filter: Design Lab', action: () => setActiveFilter('design'), icon: <PenTool size={16} /> },
 
     // Windows
     { id: 'focus-code', label: 'Focus Code Editor', action: () => focusWindow('code'), icon: <Code size={16} /> },
     { id: 'focus-tasks', label: 'Focus Mission Control', action: () => focusWindow('tasks'), icon: <Layout size={16} /> },
     { id: 'focus-db', label: 'Focus Schema Designer', action: () => focusWindow('db'), icon: <Database size={16} /> },
-    { id: 'focus-arch', label: 'Focus Architecture', action: () => focusWindow('arch'), icon: <Cpu size={16} /> },
-    { id: 'focus-git', label: 'Focus Source Control', action: () => focusWindow('git'), icon: <GitBranch size={16} /> },
     { id: 'focus-pipeline', label: 'Focus CI/CD Pipeline', action: () => focusWindow('pipeline'), icon: <Workflow size={16} /> },
   ];
 
-  // Compact Mode Logic: Activated if Terminal or Voice is active
+  // Compact Mode Logic
   const isCompactMode = isTerminalOpen || isVoiceConnected;
 
   return (
@@ -511,21 +519,18 @@ When the user asks to "go to" or "show" something, use the appropriate tool.
       // -- HUD LAYER (Fixed positioning) --
       hud={
         <>
-           {/* Top Context Bar */}
+           {/* Top Context Bar - Still useful for quick jumps in Spatial Mode */}
            <ContextBar 
               contexts={CONTEXTS} 
               activeContextId={activeContextId} 
               onSelect={handleContextSelect} 
            />
 
-           {/* Floating Context Dock */}
+           {/* New Sidebar Navigation */}
            <ContextDock 
-              contexts={CONTEXTS} 
-              activeContextId={activeContextId} 
-              onSelect={handleContextSelect} 
-              windows={windows}
-              onGather={handleGatherContext}
-              onArrange={handleArrangeContext}
+              activeFilter={activeFilter}
+              onSelectFilter={setActiveFilter}
+              onVisualOverview={handleVisualOverview}
            />
 
            {/* Minimap - Hidden in Compact Mode */}
@@ -547,7 +552,7 @@ When the user asks to "go to" or "show" something, use the appropriate tool.
              </div>
            )}
 
-           {/* Voice HUD Log - Position dynamically based on Terminal state */}
+           {/* Voice HUD Log */}
            <div 
               className={`fixed right-8 pointer-events-none z-50 transition-all duration-300 ease-in-out flex flex-col items-end ${
                   isTerminalOpen ? 'bottom-[340px]' : 'bottom-24'
@@ -558,7 +563,7 @@ When the user asks to "go to" or "show" something, use the appropriate tool.
                 </div>
            </div>
 
-           {/* Status Controls (Toolbar) - Hidden in Compact Mode */}
+           {/* Status Controls (Toolbar) */}
            {!isCompactMode && (
              <div 
                 className="fixed right-8 bottom-8 flex flex-col items-end pointer-events-none z-50 transition-all duration-300 ease-in-out"
@@ -616,6 +621,7 @@ When the user asks to "go to" or "show" something, use the appropriate tool.
               onToggleMaximize={() => setIsTerminalMaximized(p => !p)}
               isMaximized={isTerminalMaximized}
               activeContextLabel={CONTEXTS.find(c => c.id === activeContextId)?.label}
+              activeScope={activeFilter.toUpperCase()}
            >
               <ChatInterface 
                 messages={messages} 
@@ -623,10 +629,12 @@ When the user asks to "go to" or "show" something, use the appropriate tool.
                 isLoading={isProcessing} 
                 isConnected={isVoiceConnected}
                 transcripts={transcripts}
+                isActive={isTerminalOpen}
+                activeScope={activeFilter.toUpperCase()}
               />
            </TerminalDrawer>
 
-           {/* Bottom Status Bar - handles compact toggles */}
+           {/* Bottom Status Bar */}
            <StatusBar 
               panOffset={panOffset} 
               scale={scale} 
@@ -667,6 +675,8 @@ When the user asks to "go to" or "show" something, use the appropriate tool.
                         borderWidth: '1px',
                         backgroundColor: ctx.id === activeContextId ? `${ctx.color}05` : 'transparent',
                         boxShadow: ctx.id === activeContextId ? `0 0 100px ${ctx.color}10` : 'none',
+                        // Dim borders if not in all mode
+                        opacity: activeFilter === 'all' ? 1 : 0.1
                     }}
                 >
                     <div 
@@ -690,6 +700,7 @@ When the user asks to "go to" or "show" something, use the appropriate tool.
                 panOffset={panOffset}
                 scale={scale}
                 isSelected={selectedWindowId === win.id}
+                isDimmed={isWindowDimmed(win)}
                 onMove={handleWindowMove}
                 onResize={handleWindowResize}
                 onSelect={handleWindowSelect}

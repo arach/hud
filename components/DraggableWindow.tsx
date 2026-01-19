@@ -11,6 +11,7 @@ interface DraggableWindowProps {
   scale: number;
   zIndex: number;
   isSelected: boolean;
+  isDimmed?: boolean; // New Prop
   onMove: (id: string, x: number, y: number) => void;
   onResize: (id: string, w: number, h: number) => void;
   onSelect: (id: string) => void;
@@ -28,6 +29,7 @@ const DraggableWindow: React.FC<DraggableWindowProps> = ({
   scale,
   zIndex, 
   isSelected,
+  isDimmed = false,
   onMove, 
   onResize,
   onSelect,
@@ -112,17 +114,22 @@ const DraggableWindow: React.FC<DraggableWindowProps> = ({
         height: h,
         zIndex: zIndex,
         position: 'absolute',
-        touchAction: 'none'
+        touchAction: 'none',
+        // Visual styling for dimmed state
+        opacity: isDimmed ? 0.3 : 1,
+        filter: isDimmed ? 'grayscale(100%) blur(1px)' : 'none',
+        transition: 'opacity 0.3s ease, filter 0.3s ease',
+        pointerEvents: isDimmed ? 'none' : 'auto' // Prevent interaction when dimmed
       }}
       className={`
-        pointer-events-auto flex flex-col
+        flex flex-col
         ${isDragging ? 'cursor-grabbing' : ''} 
         ${className}
       `}
       onMouseDown={handleContentMouseDown} // Capture selection clicks
     >
       {/* Selection Border / Glow */}
-      <div className={`absolute -inset-[3px] pointer-events-none transition-opacity duration-300 ${isSelected ? 'opacity-100' : 'opacity-0'}`}>
+      <div className={`absolute -inset-[3px] pointer-events-none transition-opacity duration-300 ${isSelected && !isDimmed ? 'opacity-100' : 'opacity-0'}`}>
          <div className="absolute inset-0 border border-emerald-500/40 shadow-[0_0_30px_rgba(16,185,129,0.2)] animate-pulse rounded-sm"></div>
          {/* Tech Corners */}
          <div className="absolute top-0 left-0 w-3 h-3 border-t-2 border-l-2 border-emerald-400"></div>
@@ -131,19 +138,7 @@ const DraggableWindow: React.FC<DraggableWindowProps> = ({
          <div className="absolute bottom-0 right-0 w-3 h-3 border-b-2 border-r-2 border-emerald-400"></div>
       </div>
 
-      {/* DRAG HANDLE - Invisible overlay on top of header area relative to children if they have a header */}
-      {/* We intercept the children prop to inject the drag handler into the first child if possible, 
-          but for simplicity in this composition pattern, we assume the user drags the 'window' generally via a header overlay 
-          OR we wrap the children. 
-          
-          Better approach for this specific app: 
-          The children passed in App.tsx ALREADY contain a header div. 
-          We need to strictly separate drag area.
-          
-          Solution: We create a transparent 'Header Zone' at the top of the window 
-          that captures drag events, sitting underneath the actual header content if needed, 
-          or we assume the top 24px is the handle.
-      */}
+      {/* DRAG HANDLE */}
       <div 
           className="absolute top-0 left-0 right-0 h-6 z-50 cursor-grab active:cursor-grabbing"
           onMouseDown={handleMouseDown}
@@ -153,14 +148,16 @@ const DraggableWindow: React.FC<DraggableWindowProps> = ({
       {children}
 
       {/* Resize Handle */}
-      <div 
-        className="absolute bottom-0 right-0 w-6 h-6 cursor-nwse-resize group flex items-end justify-end p-1 pointer-events-auto z-50"
-        onMouseDown={handleResizeMouseDown}
-      >
-        <div className="w-1.5 h-1.5 bg-emerald-500/50 group-hover:bg-emerald-400 transition-colors mb-0.5 mr-0.5" />
-        <div className="absolute bottom-1 right-3 w-1 h-1 bg-emerald-500/30 group-hover:bg-emerald-400/50 transition-colors" />
-        <div className="absolute bottom-3 right-1 w-1 h-1 bg-emerald-500/30 group-hover:bg-emerald-400/50 transition-colors" />
-      </div>
+      {!isDimmed && (
+          <div 
+            className="absolute bottom-0 right-0 w-6 h-6 cursor-nwse-resize group flex items-end justify-end p-1 pointer-events-auto z-50"
+            onMouseDown={handleResizeMouseDown}
+          >
+            <div className="w-1.5 h-1.5 bg-emerald-500/50 group-hover:bg-emerald-400 transition-colors mb-0.5 mr-0.5" />
+            <div className="absolute bottom-1 right-3 w-1 h-1 bg-emerald-500/30 group-hover:bg-emerald-400/50 transition-colors" />
+            <div className="absolute bottom-3 right-1 w-1 h-1 bg-emerald-500/30 group-hover:bg-emerald-400/50 transition-colors" />
+          </div>
+      )}
     </div>
   );
 };

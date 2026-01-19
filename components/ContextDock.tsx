@@ -1,63 +1,77 @@
 import React from 'react';
-import { ContextDef } from './ContextBar'; 
-import { WindowState } from '../types';
-import { Magnet, LayoutGrid } from 'lucide-react';
+import { 
+  Globe, 
+  Code2, 
+  Cpu, 
+  PenTool, 
+  LayoutDashboard, 
+  MessageSquare
+} from 'lucide-react';
+
+export type FilterType = 'all' | 'dev' | 'ops' | 'design';
 
 interface ContextDockProps {
-  contexts: ContextDef[];
-  activeContextId: string;
-  onSelect: (context: ContextDef) => void;
-  windows: WindowState[];
-  onGather: (contextId: string) => void;
-  onArrange: (contextId: string) => void;
+  activeFilter: FilterType;
+  onSelectFilter: (filter: FilterType) => void;
+  onVisualOverview: () => void;
 }
 
-const ContextDock: React.FC<ContextDockProps> = ({ contexts, activeContextId, onSelect, windows, onGather, onArrange }) => {
+const ContextDock: React.FC<ContextDockProps> = ({ activeFilter, onSelectFilter, onVisualOverview }) => {
+  
+  const navItems = [
+    { id: 'all', label: 'SPATIAL VIEW', icon: <Globe size={20} />, color: '#ffffff' },
+    { id: 'dev', label: 'DEV STREAM', icon: <Code2 size={20} />, color: '#10b981' },
+    { id: 'ops', label: 'OPS COMMAND', icon: <Cpu size={20} />, color: '#f59e0b' },
+    { id: 'design', label: 'DESIGN LAB', icon: <PenTool size={20} />, color: '#3b82f6' },
+  ];
+
   return (
     <div 
-        className="fixed left-6 top-1/2 -translate-y-1/2 z-50 flex flex-col gap-4 pointer-events-auto max-h-[calc(100vh-8rem)]"
+        className="fixed left-6 top-1/2 -translate-y-1/2 z-50 flex flex-col gap-6 pointer-events-auto"
     >
-      {/* Main Dock Pill */}
-      <div className="flex flex-col bg-black/80 backdrop-blur-xl border border-neutral-800 rounded-full py-3 px-2 shadow-2xl gap-3 overflow-y-auto overflow-x-hidden no-scrollbar">
+      {/* Main Navigation Pill */}
+      <div className="flex flex-col bg-black/80 backdrop-blur-xl border border-neutral-800 rounded-full py-4 px-2 shadow-2xl gap-4">
         
-        {/* Context Navigation */}
-        {contexts.map((ctx) => {
-            const isActive = activeContextId === ctx.id;
-            const count = windows.filter(w => w.contextId === ctx.id).length;
+        {navItems.map((item) => {
+            const isActive = activeFilter === item.id;
             
             return (
-                <div key={ctx.id} className="relative group flex items-center justify-center shrink-0">
-                    {/* Tooltip (Left side) */}
-                    <div className="absolute left-full ml-4 px-2 py-1 bg-neutral-900 border border-neutral-800 rounded text-[10px] text-neutral-300 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50">
-                        {ctx.label}
+                <div key={item.id} className="relative group flex items-center justify-center shrink-0">
+                    {/* Tooltip */}
+                    <div className="absolute left-full ml-4 px-3 py-1.5 bg-neutral-900 border border-neutral-800 rounded text-[10px] font-bold tracking-wider text-neutral-300 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50 shadow-xl">
+                        {item.label}
+                        {isActive && <span className="ml-2 text-emerald-500">• ACTIVE</span>}
                     </div>
 
                     <button
-                        onClick={() => onSelect(ctx)}
+                        onClick={() => onSelectFilter(item.id as FilterType)}
                         className={`
                             relative w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 group
-                            ${isActive ? 'bg-neutral-800' : 'hover:bg-neutral-800/50'}
+                            ${isActive ? 'bg-neutral-800 scale-110' : 'hover:bg-neutral-800/50 hover:scale-105'}
                         `}
                     >
-                        <div style={{ color: isActive ? ctx.color : '#525252' }} className="transition-colors">
-                            {ctx.icon}
+                        <div style={{ color: isActive ? item.color : '#525252' }} className="transition-colors">
+                            {item.icon}
                         </div>
                         
-                        {/* Active Indicator */}
+                        {/* Active Indicator Ring */}
                         {isActive && (
                             <div className="absolute inset-0 rounded-full border border-white/10 shadow-[0_0_15px_rgba(255,255,255,0.05)]"></div>
                         )}
                         
                         {/* Vertical Active Line */}
                         {isActive && (
-                            <div className="absolute -left-2 top-1/2 -translate-y-1/2 w-0.5 h-4 bg-white rounded-full shadow-[0_0_10px_white]"></div>
+                            <div 
+                                className="absolute -left-3 top-1/2 -translate-y-1/2 w-0.5 h-6 rounded-full shadow-[0_0_10px_currentColor] transition-all"
+                                style={{ backgroundColor: item.color }}
+                            ></div>
                         )}
                     </button>
-
-                    {/* Window Count Dot */}
-                    {count > 0 && (
-                        <div className="absolute top-0 right-0 w-3 h-3 bg-neutral-900 rounded-full flex items-center justify-center border border-neutral-800">
-                             <div className="w-1 h-1 rounded-full bg-neutral-500"></div>
+                    
+                    {/* Chat Context Indicator (Small Dot) */}
+                    {isActive && (
+                        <div className="absolute -bottom-1 -right-1 bg-neutral-950 rounded-full p-0.5 border border-neutral-800">
+                             <MessageSquare size={8} className="text-neutral-500" />
                         </div>
                     )}
                 </div>
@@ -66,31 +80,16 @@ const ContextDock: React.FC<ContextDockProps> = ({ contexts, activeContextId, on
 
         <div className="w-full h-px bg-neutral-800/50 my-1 shrink-0"></div>
 
-        {/* Intra-Context Tools */}
-        
-        {/* Action: Gather Windows */}
+        {/* Visual Overview Action */}
         <div className="relative group flex items-center justify-center shrink-0">
-             <div className="absolute left-full ml-4 px-2 py-1 bg-neutral-900 border border-neutral-800 rounded text-[10px] text-neutral-300 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50">
-                Gather Windows (Magnet)
+             <div className="absolute left-full ml-4 px-3 py-1.5 bg-neutral-900 border border-neutral-800 rounded text-[10px] font-bold tracking-wider text-neutral-300 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50 shadow-xl">
+                VISUAL OVERVIEW
              </div>
              <button 
-                onClick={() => onGather(activeContextId)}
-                className="w-10 h-10 rounded-full flex items-center justify-center text-neutral-500 hover:text-white hover:bg-neutral-800 transition-all"
+                onClick={onVisualOverview}
+                className="w-10 h-10 rounded-full flex items-center justify-center text-neutral-500 hover:text-white hover:bg-neutral-800 transition-all hover:scale-105"
              >
-                <Magnet size={18} />
-             </button>
-        </div>
-
-        {/* Action: Arrange Grid */}
-        <div className="relative group flex items-center justify-center shrink-0">
-             <div className="absolute left-full ml-4 px-2 py-1 bg-neutral-900 border border-neutral-800 rounded text-[10px] text-neutral-300 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50">
-                Arrange Grid
-             </div>
-             <button 
-                onClick={() => onArrange(activeContextId)}
-                className="w-10 h-10 rounded-full flex items-center justify-center text-neutral-500 hover:text-white hover:bg-neutral-800 transition-all"
-             >
-                <LayoutGrid size={18} />
+                <LayoutDashboard size={20} />
              </button>
         </div>
 
