@@ -39,6 +39,8 @@ import {
   Search,
 } from 'lucide-react';
 
+import ApiKeyModal from './components/ApiKeyModal';
+
 const generateId = () => Math.random().toString(36).substring(2, 9);
 
 // -- Context Definitions --
@@ -80,6 +82,7 @@ const App: React.FC = () => {
   const [selectedWindowId, setSelectedWindowId] = useState<string | null>(null);
   const [isCmdPaletteOpen, setIsCmdPaletteOpen] = useState(false);
   const [activeContextId, setActiveContextId] = useState<string>('dev');
+  const [hasApiKey, setHasApiKey] = useState(false);
 
   // -- Window Management --
   const [windows, setWindows] = useState<WindowState[]>(INITIAL_WINDOWS);
@@ -129,11 +132,29 @@ const App: React.FC = () => {
 
   // -- Effects --
   useEffect(() => {
+    // Check for API Key on mount
+    const storedKey = localStorage.getItem('GEMINI_API_KEY');
+    const envKey = process.env.API_KEY;
+    
+    if (storedKey || envKey) {
+        setHasApiKey(true);
+        // Ensure service is initialized if using stored key
+        if (storedKey && !geminiService.isConfigured()) {
+            geminiService.initialize(storedKey);
+        }
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!hasApiKey) return;
+
     geminiService.startChat(messages.slice(1).map(m => ({
         role: m.role,
         parts: [{ text: m.content }]
     })));
+  }, [hasApiKey]);
 
+  useEffect(() => {
     const handleResize = () => {
         setViewport({ width: window.innerWidth, height: window.innerHeight });
     };
@@ -296,6 +317,12 @@ const App: React.FC = () => {
       handleContextSelect(CONTEXTS[0]);
   }, [handleContextSelect]);
 
+  const handleSaveKey = (key: string) => {
+    localStorage.setItem('GEMINI_API_KEY', key);
+    geminiService.initialize(key);
+    setHasApiKey(true);
+  };
+
   const focusWindow = useCallback((id: string) => {
       handleWindowSelect(id);
       const win = windows.find(w => w.id === id);
@@ -409,13 +436,15 @@ const App: React.FC = () => {
   ];
 
   return (
-    <HUDFrame 
-      panOffset={panOffset} 
-      scale={scale} 
-      onPan={handlePan} 
-      onZoom={handleZoom}
-      // -- HUD LAYER (Fixed positioning, no scaling) --
-      hud={
+    <>
+      <ApiKeyModal isOpen={!hasApiKey} onSave={handleSaveKey} />
+      <HUDFrame 
+        panOffset={panOffset} 
+        scale={scale} 
+        onPan={handlePan} 
+        onZoom={handleZoom}
+        // -- HUD LAYER (Fixed positioning, no scaling) --
+        hud={
         <>
            {/* Top Context Bar (Restored) */}
            <ContextBar 
@@ -547,6 +576,7 @@ const App: React.FC = () => {
         ))}
 
     </HUDFrame>
+    </>
   );
 };
 

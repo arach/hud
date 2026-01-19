@@ -29,9 +29,14 @@ export const useLiveSession = () => {
 
     // Connect to Gemini Live
     const connect = useCallback(async () => {
-        const apiKey = process.env.API_KEY;
+        let apiKey = process.env.API_KEY;
+        
         if (!apiKey) {
-            console.error("No API key found");
+            apiKey = localStorage.getItem('GEMINI_API_KEY') || undefined;
+        }
+
+        if (!apiKey) {
+            console.error("No API key found in Env or Storage");
             return;
         }
 

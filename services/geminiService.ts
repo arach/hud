@@ -48,18 +48,35 @@ const tools: Tool[] = [
 // --- Service Class ---
 
 export class GeminiService {
-  private ai: GoogleGenAI;
+  private ai: GoogleGenAI | null = null;
   private chatSession: any;
+  private apiKey: string | null = null;
 
   constructor() {
-    const apiKey = process.env.API_KEY;
-    if (!apiKey) {
-      console.error("API_KEY not found in environment variables");
+    // Try to load from storage on init, or check env for dev convenience
+    const storedKey = localStorage.getItem('GEMINI_API_KEY');
+    const envKey = process.env.API_KEY; // Fallback for local dev
+    
+    if (storedKey) {
+      this.initialize(storedKey);
+    } else if (envKey) {
+      this.initialize(envKey);
     }
-    this.ai = new GoogleGenAI({ apiKey: apiKey || '' });
+  }
+
+  public initialize(apiKey: string) {
+    this.apiKey = apiKey;
+    this.ai = new GoogleGenAI({ apiKey });
+    this.chatSession = null; // Reset session on new key
+  }
+
+  public isConfigured(): boolean {
+    return !!this.apiKey;
   }
 
   public async startChat(history: any[] = []) {
+    if (!this.ai) return; // Wait for init
+
     try {
       this.chatSession = this.ai.chats.create({
         model: GEMINI_MODEL,
@@ -82,6 +99,10 @@ export class GeminiService {
       onTaskComplete: (id: string) => string 
     }
   ): Promise<string> {
+    if (!this.ai || !this.isConfigured()) {
+        return "System halted: API Key required for uplink.";
+    }
+
     if (!this.chatSession) {
       await this.startChat();
     }
