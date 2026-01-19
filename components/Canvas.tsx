@@ -55,10 +55,15 @@ const Canvas: React.FC<CanvasProps> = ({ panOffset, scale, onPan }) => {
     }
   };
 
-  const majorGridSize = 100 * scale;
-  const minorGridSize = 20 * scale;
-  const bgPosX = panOffset.x * scale;
-  const bgPosY = panOffset.y * scale;
+  // Adjust grid density based on scale to prevent it from disappearing or becoming too dense
+  const clampedScale = Math.max(0.4, Math.min(2, scale));
+  const majorGridSize = 100 * clampedScale;
+  const minorGridSize = 20 * clampedScale;
+  
+  // Calculate background position modulo the grid size to keep numbers small and prevent 'running out' artifacts
+  // though CSS handles large numbers, this ensures visual consistency
+  const bgPosX = (panOffset.x * scale) % majorGridSize;
+  const bgPosY = (panOffset.y * scale) % majorGridSize;
 
   return (
     <div 
@@ -67,60 +72,59 @@ const Canvas: React.FC<CanvasProps> = ({ panOffset, scale, onPan }) => {
     >
       {/* Blueprint Grid - Major */}
       <div 
-        className="absolute inset-0 opacity-[0.06] pointer-events-none"
+        className="absolute inset-0 opacity-[0.08] pointer-events-none"
         style={{
             backgroundImage: `
                 linear-gradient(to right, #404050 1px, transparent 1px),
                 linear-gradient(to bottom, #404050 1px, transparent 1px)
             `,
             backgroundSize: `${majorGridSize}px ${majorGridSize}px`,
-            backgroundPosition: `${bgPosX}px ${bgPosY}px`
+            backgroundPosition: `${bgPosX}px ${bgPosY}px`,
+            backgroundRepeat: 'repeat'
         }}
       />
       
       {/* Blueprint Grid - Minor */}
       <div 
-        className="absolute inset-0 opacity-[0.03] pointer-events-none"
+        className="absolute inset-0 opacity-[0.04] pointer-events-none"
         style={{
             backgroundImage: `
                 linear-gradient(to right, #303040 1px, transparent 1px),
                 linear-gradient(to bottom, #303040 1px, transparent 1px)
             `,
             backgroundSize: `${minorGridSize}px ${minorGridSize}px`,
-            backgroundPosition: `${bgPosX}px ${bgPosY}px`
+            backgroundPosition: `${bgPosX}px ${bgPosY}px`,
+            backgroundRepeat: 'repeat'
         }}
       />
 
-      {/* Center Axis */}
-       <div 
-         className="absolute top-0 bottom-0 w-px bg-white/5 pointer-events-none"
-         style={{ left: `calc(50% + ${bgPosX}px)` }}
-       ></div>
-       <div 
-         className="absolute left-0 right-0 h-px bg-white/5 pointer-events-none"
-         style={{ top: `calc(50% + ${bgPosY}px)` }}
-       ></div>
+      {/* Origin Marker (World 0,0) */}
+      <div 
+         className="absolute w-2 h-2 bg-emerald-500 rounded-full opacity-50 pointer-events-none"
+         style={{ 
+             left: `calc(50% + ${panOffset.x * scale}px - 4px)`, 
+             top: `calc(50% + ${panOffset.y * scale}px - 4px)` 
+         }}
+      />
 
       {/* Cursor Guides */}
       {showGuides && (
         <>
           <div 
-            className="absolute top-0 bottom-0 w-px pointer-events-none"
+            className="absolute top-0 bottom-0 w-px pointer-events-none bg-emerald-500/10"
             style={{ 
                 left: mousePos.x,
-                borderLeft: '1px dashed rgba(100, 100, 100, 0.2)' 
             }}
           />
           <div 
-            className="absolute left-0 right-0 h-px pointer-events-none"
+            className="absolute left-0 right-0 h-px pointer-events-none bg-emerald-500/10"
             style={{ 
                 top: mousePos.y,
-                borderTop: '1px dashed rgba(100, 100, 100, 0.2)'
             }}
           />
           
           <div 
-             className="absolute text-[9px] font-mono text-neutral-600 pl-2 pt-2 whitespace-nowrap pointer-events-none"
+             className="absolute text-[9px] font-mono text-emerald-500/50 pl-2 pt-2 whitespace-nowrap pointer-events-none"
              style={{ left: mousePos.x, top: mousePos.y }}
           >
              X:{((mousePos.x / scale) - panOffset.x - (window.innerWidth / 2 / scale)).toFixed(0)} <span className="mx-1 opacity-30">|</span> Y:{((mousePos.y / scale) - panOffset.y).toFixed(0)}
