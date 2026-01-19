@@ -94,7 +94,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
 
         {isLoading && (
           <div className="text-[10px] text-emerald-500 animate-pulse font-bold select-none pl-2">
-             >> PROCESSING...
+             {'>>'} PROCESSING...
           </div>
         )}
       </div>
