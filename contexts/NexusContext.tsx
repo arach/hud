@@ -7,39 +7,67 @@ import {
   Code2, 
   PenTool, 
   Server, 
-  Monitor 
+  Monitor,
+  Globe
 } from 'lucide-react';
 import { ContextDef } from '../components/ContextBar';
 import { ViewMode } from '../components/ContextDock';
 
-// --- INITIAL DATA DEFINITIONS ---
+// --- LAYOUT SYSTEM CONSTANTS ---
+// We define a coordinate system where contexts are spaced out generously.
+// Origins for each context:
+const ORIGIN_DEV = { x: 0, y: 0 };
+const ORIGIN_DESIGN = { x: 1800, y: 0 };
+const ORIGIN_OPS = { x: 0, y: 1200 };
+const ORIGIN_STUDIO = { x: 1800, y: 1200 };
+
+// Helper to offset windows relative to their context origin
+// This makes "Tiling" easy to reason about.
+const layout = (origin: {x: number, y: number}, x: number, y: number, w: number, h: number) => ({
+    x: origin.x + x,
+    y: origin.y + y,
+    w,
+    h
+});
 
 export const CONTEXTS: ContextDef[] = [
-  { id: 'dev', label: 'DEV CORE', x: 0, y: 0, color: '#10b981', icon: <Code2 size={18} /> },
-  { id: 'design', label: 'BLUEPRINTS', x: 1800, y: 0, color: '#3b82f6', icon: <PenTool size={18} /> },
-  { id: 'ops', label: 'SYSTEM OPS', x: 0, y: 1400, color: '#f59e0b', icon: <Server size={18} /> },
-  { id: 'studio', label: 'VISUAL STUDIO', x: 1800, y: 1400, color: '#8b5cf6', icon: <Monitor size={18} /> },
+  { id: 'global', label: 'GLOBAL NETWORK', x: 0, y: 0, color: '#ec4899', icon: <Globe size={18} /> }, 
+  { id: 'dev', label: 'DEV CORE', ...ORIGIN_DEV, color: '#10b981', icon: <Code2 size={18} /> },
+  { id: 'design', label: 'BLUEPRINTS', ...ORIGIN_DESIGN, color: '#3b82f6', icon: <PenTool size={18} /> },
+  { id: 'ops', label: 'SYSTEM OPS', ...ORIGIN_OPS, color: '#f59e0b', icon: <Server size={18} /> },
+  { id: 'studio', label: 'VISUAL STUDIO', ...ORIGIN_STUDIO, color: '#8b5cf6', icon: <Monitor size={18} /> },
 ];
 
-const INITIAL_WINDOWS: WindowState[] = [
-    // --- DEV CORE ---
-    { id: 'code', contextId: 'dev', type: 'editor', title: 'Code Editor', x: 100, y: 100, w: 800, h: 600, zIndex: 10 },
-    { id: 'docs', contextId: 'dev', type: 'editor', title: 'Documentation', x: 950, y: 100, w: 450, h: 600, zIndex: 9 },
-    { id: 'tasks', contextId: 'dev', type: 'terminal', title: 'Mission Control', x: 100, y: 750, w: 400, h: 400, zIndex: 10 },
+const DEFAULT_WINDOWS: WindowState[] = [
+    // --- DEV CORE (Bento Grid) ---
+    // Main Code Editor takes left side
+    { id: 'code', contextId: 'dev', type: 'editor', title: 'Code Editor', ...layout(ORIGIN_DEV, 0, 0, 800, 620), zIndex: 10 },
+    // Docs top right
+    { id: 'docs', contextId: 'dev', type: 'editor', title: 'Documentation', ...layout(ORIGIN_DEV, 820, 0, 400, 400), zIndex: 9 },
+    // Tasks bottom right
+    { id: 'tasks', contextId: 'dev', type: 'terminal', title: 'Mission Control', ...layout(ORIGIN_DEV, 820, 420, 400, 200), zIndex: 10 },
 
-    // --- BLUEPRINTS ---
-    { id: 'db', contextId: 'design', type: 'visual', title: 'Schema Designer', x: 1800, y: 100, w: 700, h: 500, zIndex: 10 },
-    { id: 'arch', contextId: 'design', type: 'visual', title: 'Architecture', x: 2550, y: 100, w: 700, h: 500, zIndex: 10 },
-    { id: 'git', contextId: 'design', type: 'terminal', title: 'Source Control', x: 1800, y: 650, w: 600, h: 450, zIndex: 10 },
+    // --- BLUEPRINTS (Top Row Split, Bottom Full) ---
+    // DB Schema Top Left
+    { id: 'db', contextId: 'design', type: 'visual', title: 'Schema Designer', ...layout(ORIGIN_DESIGN, 0, 0, 600, 450), zIndex: 10 },
+    // Arch Top Right
+    { id: 'arch', contextId: 'design', type: 'visual', title: 'Architecture', ...layout(ORIGIN_DESIGN, 620, 0, 600, 450), zIndex: 10 },
+    // Git Timeline Bottom Full
+    { id: 'git', contextId: 'design', type: 'terminal', title: 'Source Control', ...layout(ORIGIN_DESIGN, 0, 470, 1220, 300), zIndex: 10 },
 
-    // --- SYSTEM OPS ---
-    { id: 'pipeline', contextId: 'ops', type: 'terminal', title: 'CI/CD Pipeline', x: 100, y: 1400, w: 800, h: 400, zIndex: 10 },
-    { id: 'process', contextId: 'ops', type: 'terminal', title: 'Process Dashboard', x: 950, y: 1400, w: 500, h: 400, zIndex: 10 },
-    { id: 'logs', contextId: 'ops', type: 'terminal', title: 'System Logs', x: 100, y: 1850, w: 800, h: 400, zIndex: 10 },
+    // --- SYSTEM OPS (Top Full, Bottom Split) ---
+    // Pipeline Monitor Top Full
+    { id: 'pipeline', contextId: 'ops', type: 'terminal', title: 'CI/CD Pipeline', ...layout(ORIGIN_OPS, 0, 0, 1220, 350), zIndex: 10 },
+    // Process Monitor Bottom Left
+    { id: 'process', contextId: 'ops', type: 'terminal', title: 'Process Dashboard', ...layout(ORIGIN_OPS, 0, 370, 600, 400), zIndex: 10 },
+    // System Logs Bottom Right
+    { id: 'logs', contextId: 'ops', type: 'terminal', title: 'System Logs', ...layout(ORIGIN_OPS, 620, 370, 600, 400), zIndex: 10 },
 
-    // --- VISUAL STUDIO ---
-    { id: 'ui', contextId: 'studio', type: 'visual', title: 'UI Preview', x: 1800, y: 1400, w: 900, h: 600, zIndex: 11 },
-    { id: 'diff', contextId: 'studio', type: 'editor', title: 'Diff Viewer', x: 2750, y: 1400, w: 600, h: 600, zIndex: 10 },
+    // --- VISUAL STUDIO (Left/Right Split) ---
+    // UI Preview Large Left
+    { id: 'ui', contextId: 'studio', type: 'visual', title: 'UI Preview', ...layout(ORIGIN_STUDIO, 0, 0, 800, 720), zIndex: 11 },
+    // Diff Viewer Narrow Right
+    { id: 'diff', contextId: 'studio', type: 'editor', title: 'Diff Viewer', ...layout(ORIGIN_STUDIO, 820, 0, 400, 720), zIndex: 10 },
 ];
 
 const INITIAL_THREADS: AiThread[] = [
@@ -76,10 +104,14 @@ interface NexusContextType {
   setActiveContextId: (id: string) => void;
   setActiveView: (view: ViewMode) => void;
   updateWindow: (id: string, updates: Partial<WindowState>) => void;
+  closeWindow: (id: string) => void; // New
+  restoreContextDefaults: (contextId: string) => void; // New
   selectWindow: (id: string) => void;
   focusWindow: (id: string) => WindowState | undefined;
   resetLayout: () => void;
   checkAuth: () => boolean;
+  // Layout Engine
+  getSyntheticLayout: (win: WindowState, viewport: {width: number, height: number}, panOffset: {x: number, y: number}, scale: number) => { x: number, y: number, w: number, h: number, opacity: number, pointerEvents: 'auto' | 'none' };
 }
 
 const NexusContext = createContext<NexusContextType | undefined>(undefined);
@@ -105,9 +137,9 @@ export const NexusProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   });
 
   // -- State: Ephemeral --
-  const [windows, setWindows] = useState<WindowState[]>(INITIAL_WINDOWS);
+  const [windows, setWindows] = useState<WindowState[]>(DEFAULT_WINDOWS);
   const [activeThreads, setActiveThreads] = useState<AiThread[]>(INITIAL_THREADS);
-  const [activeContextId, setActiveContextId] = useState<string>('dev');
+  const [activeContextId, setActiveContextId] = useState<string>('global'); // Default to Global
   const [activeView, setActiveView] = useState<ViewMode>('spatial');
   const [isProcessing, setIsProcessing] = useState(false);
 
@@ -130,6 +162,7 @@ export const NexusProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         parts: [{ text: m.content }]
     }));
     geminiService.startChat(history);
+  }, [hasApiKey]); // Run when API key becomes available
   }, [hasApiKey]); // Run when API key becomes available
 
   // -- Actions --
@@ -171,13 +204,11 @@ export const NexusProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setIsProcessing(true);
 
     try {
-      // Inject scope context if provided
       let contextText = text;
       if (scope) {
          contextText = `[SCOPE: ${scope}] ${text}`;
       }
 
-      // Pass the callbacks to the service
       const responseText = await geminiService.sendMessage(contextText, {
         tasks,
         onTaskCreate: createTask,
@@ -210,6 +241,19 @@ export const NexusProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setWindows(prev => prev.map(w => w.id === id ? { ...w, ...updates } : w));
   }, []);
 
+  const closeWindow = useCallback((id: string) => {
+    setWindows(prev => prev.filter(w => w.id !== id));
+  }, []);
+
+  const restoreContextDefaults = useCallback((contextId: string) => {
+    const defaults = DEFAULT_WINDOWS.filter(w => w.contextId === contextId);
+    setWindows(prev => {
+        const existingIds = new Set(prev.map(w => w.id));
+        const toAdd = defaults.filter(w => !existingIds.has(w.id));
+        return [...prev, ...toAdd];
+    });
+  }, []);
+
   const selectWindow = useCallback((id: string) => {
     setWindows(prev => {
         const maxZ = Math.max(...prev.map(w => w.zIndex));
@@ -223,10 +267,104 @@ export const NexusProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, [selectWindow, windows]);
 
   const resetLayout = useCallback(() => {
-    setWindows(INITIAL_WINDOWS);
-    setActiveContextId('dev');
+    setWindows(DEFAULT_WINDOWS);
+    setActiveContextId('global');
     setActiveView('spatial');
   }, []);
+
+  // -- SYNTHETIC LAYOUT ENGINE (HIERARCHICAL) --
+  const getSyntheticLayout = useCallback((win: WindowState, viewport: {width: number, height: number}, panOffset: {x: number, y: number}, scale: number) => {
+      
+      // -- FILTER LEVEL 1: SCOPE (Top Bar) --
+      // If we are not in 'global', and the window's context doesn't match, it is hidden.
+      if (activeContextId !== 'global' && win.contextId !== activeContextId) {
+          return {
+              x: win.x,
+              y: win.y,
+              w: win.w,
+              h: win.h,
+              opacity: 0, // Fully hidden
+              pointerEvents: 'none' as const
+          };
+      }
+
+      // -- FILTER LEVEL 2: VIEW MODE (Left Dock) --
+      // Even if in scope, we might filter by type (Terminal vs Editor).
+      let matchesType = true;
+      if (activeView === 'terminals' && win.type !== 'terminal') matchesType = false;
+      if (activeView === 'editors' && win.type !== 'editor') matchesType = false;
+      if (activeView === 'visuals' && win.type !== 'visual') matchesType = false;
+
+      if (!matchesType) {
+          return {
+              x: win.x,
+              y: win.y,
+              w: win.w,
+              h: win.h,
+              opacity: 0, // Fully hidden
+              pointerEvents: 'none' as const
+          };
+      }
+
+      // -- LAYOUT LEVEL: SPATIAL vs GRID --
+      
+      // If Spatial View: Return actual coordinates
+      if (activeView === 'spatial') {
+          return {
+              x: win.x,
+              y: win.y,
+              w: win.w,
+              h: win.h,
+              opacity: 1,
+              pointerEvents: 'auto' as const
+          };
+      }
+
+      // If Grid View: Calculate Grid Position based on FILTERED list
+      // 1. Get list of ALL windows that satisfy the current Scope AND View filters
+      const matchingWindows = [...windows]
+          .filter(w => {
+              const scopeMatch = activeContextId === 'global' || w.contextId === activeContextId;
+              
+              let typeMatch = true;
+              if (activeView === 'terminals' && w.type !== 'terminal') typeMatch = false;
+              if (activeView === 'editors' && w.type !== 'editor') typeMatch = false;
+              if (activeView === 'visuals' && w.type !== 'visual') typeMatch = false;
+              
+              return scopeMatch && typeMatch;
+          })
+          .sort((a, b) => a.id.localeCompare(b.id)); // Stable Sort
+
+      const index = matchingWindows.findIndex(w => w.id === win.id);
+      
+      // Grid Constants
+      const gap = 40;
+      const gridW = 700;
+      const gridH = 500;
+      
+      const cols = Math.ceil(Math.sqrt(matchingWindows.length));
+      
+      const totalW = (cols * gridW) + ((cols - 1) * gap);
+      const totalH = (Math.ceil(matchingWindows.length / cols) * gridH) + ((Math.ceil(matchingWindows.length / cols) - 1) * gap);
+      
+      const vpCenterX = (-panOffset.x) + (viewport.width / 2 / scale);
+      const vpCenterY = (-panOffset.y) + (viewport.height / 2 / scale);
+      
+      const startX = vpCenterX - (totalW / 2);
+      const startY = vpCenterY - (totalH / 2);
+      
+      const col = index % cols;
+      const row = Math.floor(index / cols);
+
+      return {
+          x: startX + (col * (gridW + gap)),
+          y: startY + (row * (gridH + gap)),
+          w: gridW,
+          h: gridH,
+          opacity: 1,
+          pointerEvents: 'auto' as const
+      };
+  }, [activeContextId, activeView, windows]);
 
   return (
     <NexusContext.Provider value={{
@@ -244,10 +382,13 @@ export const NexusProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       setActiveContextId,
       setActiveView,
       updateWindow,
+      closeWindow,
+      restoreContextDefaults,
       selectWindow,
       focusWindow,
       resetLayout,
-      checkAuth
+      checkAuth,
+      getSyntheticLayout
     }}>
       {children}
     </NexusContext.Provider>
