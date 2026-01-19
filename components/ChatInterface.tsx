@@ -124,7 +124,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ messages, onSendMessage, 
 
         {isLoading && (
           <div className="text-[10px] text-emerald-500 animate-pulse font-bold select-none">
-             >> PROCESSING STREAM...
+             {'>>'} PROCESSING STREAM...
           </div>
         )}
       </div>
