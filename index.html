@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Nexus Workspace</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['"JetBrains Mono"', 'monospace'], // Defaulting sans to JetBrains Mono
+              mono: ['"JetBrains Mono"', 'monospace'],
+            },
+            colors: {
+              glass: {
+                100: 'rgba(0, 0, 0, 0.7)',
+                200: 'rgba(20, 20, 20, 0.7)',
+                border: 'rgba(255, 255, 255, 0.2)',
+                highlight: 'rgba(255, 255, 255, 0.1)',
+              }
+            },
+          },
+        },
+      }
+    </script>
+    <style>
+      body {
+        background-color: #000000;
+        color: #ededed;
+        overflow: hidden;
+      }
+      /* Custom Scrollbar */
+      ::-webkit-scrollbar {
+        width: 2px;
+        height: 2px;
+      }
+      ::-webkit-scrollbar-track {
+        background: #000; 
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #333; 
+      }
+      /* Editor Overlay Alignment */
+      .editor-container {
+        position: relative;
+        font-family: "JetBrains Mono", monospace;
+        font-size: 10px;
+        line-height: 1.5;
+      }
+      .editor-layer {
+        position: absolute;
+        top: 0;
+        left: 0;
+        height: 100%;
+        width: 100%;
+        padding: 0.75rem; /* p-3 equivalent */
+        margin: 0;
+        border: 0;
+        box-sizing: border-box;
+        overflow: hidden;
+        white-space: pre-wrap;
+        word-break: break-all;
+      }
+      .editor-textarea {
+        z-index: 10;
+        color: transparent;
+        background: transparent;
+        caret-color: #10b981; /* Emerald 500 */
+        resize: none;
+        outline: none;
+      }
+      .editor-highlight {
+        z-index: 0;
+        pointer-events: none;
+      }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "recharts": "https://esm.sh/recharts@^3.6.0",
+    "react-dom/client": "https://esm.sh/react-dom@^19.2.3/client",
+    "react-dom": "https://esm.sh/react-dom@^19.2.3",
+    "lucide-react": "https://esm.sh/lucide-react@^0.562.0",
+    "react/": "https://esm.sh/react@^19.2.3/",
+    "react": "https://esm.sh/react@^19.2.3",
+    "@google/genai": "https://esm.sh/@google/genai@^1.37.0",
+    "uuid": "https://esm.sh/uuid@^13.0.0",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "prismjs": "https://esm.sh/prismjs@1.29.0",
+    "prismjs/": "https://esm.sh/prismjs@1.29.0/"
+  }
+}
+</script>
+</head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>
