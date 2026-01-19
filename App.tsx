@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import HUDFrame from './components/HUDFrame';
 import ChatInterface from './components/ChatInterface';
 import TaskManager from './components/TaskManager';
 import Minimap from './components/Minimap';
+import StatusBar from './components/StatusBar';
 import DraggableWindow from './components/DraggableWindow';
 import DbSchema from './components/tools/DbSchema';
 import ArchDiagram from './components/tools/ArchDiagram';
@@ -35,6 +36,7 @@ import {
   Code2,
   PenTool,
   Server,
+  Search,
 } from 'lucide-react';
 
 const generateId = () => Math.random().toString(36).substring(2, 9);
@@ -95,26 +97,34 @@ const App: React.FC = () => {
   const [isProcessing, setIsProcessing] = useState(false);
 
   // -- Helpers --
-  const getContextBounds = useCallback((ctxId: string) => {
-    const ctxWindows = windows.filter(w => w.contextId === ctxId);
-    if (ctxWindows.length === 0) return null;
+  // Memoized bounds calculation to prevent lag during re-renders
+  const contextBounds = useMemo(() => {
+    const bounds: Record<string, { x: number; y: number; w: number; h: number } | null> = {};
+    const padding = 60;
 
-    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    CONTEXTS.forEach(ctx => {
+      const ctxWindows = windows.filter(w => w.contextId === ctx.id);
+      if (ctxWindows.length === 0) {
+        bounds[ctx.id] = null;
+        return;
+      }
 
-    ctxWindows.forEach(w => {
-        if (w.x < minX) minX = w.x;
-        if (w.y < minY) minY = w.y;
-        if (w.x + w.w > maxX) maxX = w.x + w.w;
-        if (w.y + w.h > maxY) maxY = w.y + w.h;
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      ctxWindows.forEach(w => {
+          if (w.x < minX) minX = w.x;
+          if (w.y < minY) minY = w.y;
+          if (w.x + w.w > maxX) maxX = w.x + w.w;
+          if (w.y + w.h > maxY) maxY = w.y + w.h;
+      });
+
+      bounds[ctx.id] = {
+          x: minX - padding,
+          y: minY - padding - 40,
+          w: (maxX - minX) + (padding * 2),
+          h: (maxY - minY) + (padding * 2) + 40
+      };
     });
-
-    const padding = 60; 
-    return {
-        x: minX - padding,
-        y: minY - padding - 40, // Extra top space for label
-        w: (maxX - minX) + (padding * 2),
-        h: (maxY - minY) + (padding * 2) + 40
-    };
+    return bounds;
   }, [windows]);
 
   // -- Effects --
@@ -153,7 +163,7 @@ const App: React.FC = () => {
 
     // Determine context centers dynamically
     const contextCenters = CONTEXTS.map(ctx => {
-        const bounds = getContextBounds(ctx.id);
+        const bounds = contextBounds[ctx.id];
         if (bounds) {
             return {
                 id: ctx.id,
@@ -175,7 +185,7 @@ const App: React.FC = () => {
     if (closest && closest.id !== activeContextId) {
         setActiveContextId(closest.id);
     }
-  }, [panOffset, scale, viewport, getContextBounds, activeContextId]);
+  }, [panOffset, scale, viewport, contextBounds, activeContextId]);
 
   // -- Handlers --
   const handlePan = useCallback((delta: { x: number; y: number }) => {
@@ -210,7 +220,7 @@ const App: React.FC = () => {
   }, []);
 
   const handleContextSelect = useCallback((ctx: ContextDef) => {
-      const bounds = getContextBounds(ctx.id);
+      const bounds = contextBounds[ctx.id];
       let targetX, targetY;
 
       if (bounds) {
@@ -227,7 +237,7 @@ const App: React.FC = () => {
       
       setPanOffset({ x: targetPanX, y: targetPanY });
       setActiveContextId(ctx.id);
-  }, [viewport, scale, getContextBounds]);
+  }, [viewport, scale, contextBounds]);
 
   const handleGatherContext = useCallback((contextId: string) => {
      // Find center of current view
@@ -425,12 +435,13 @@ const App: React.FC = () => {
            />
 
            {/* Minimap (Bottom Left) */}
-           <div className="absolute bottom-8 left-8 pointer-events-auto shadow-2xl border border-neutral-800 bg-black z-50">
+           <div className="absolute bottom-10 left-8 pointer-events-auto shadow-2xl border border-neutral-800 bg-black z-40">
              <div className="w-[200px] h-[150px]">
                  <Minimap 
                     windows={windows} 
                     viewport={{ ...viewport, x: -panOffset.x, y: -panOffset.y }} 
                     panOffset={panOffset} 
+                    appScale={scale}
                     onNavigate={handleNavigate} 
                     width={200} 
                     height={150} 
@@ -438,29 +449,33 @@ const App: React.FC = () => {
              </div>
            </div>
 
-           {/* Status Controls (Bottom Right) */}
-           <div className="absolute bottom-8 right-8 flex flex-col items-end pointer-events-none z-50">
-              <div className="text-right opacity-50 select-none mb-4">
-                  <div className="text-4xl font-bold text-neutral-800 tracking-tighter">NEXUS</div>
-                  <div className="text-xs text-neutral-600 tracking-[0.2em] font-bold">AGENT WORKSPACE</div>
-              </div>
-              <div className="pointer-events-auto flex flex-col items-end gap-3">
-                   <div className="flex items-center gap-3 text-[10px] font-mono text-neutral-500 bg-black/80 backdrop-blur-sm px-3 py-1.5 rounded border border-neutral-800 shadow-xl">
-                      <span>POS: {panOffset.x.toFixed(0)}, {panOffset.y.toFixed(0)}</span>
-                      <span className="text-neutral-700">|</span>
-                      <span>SCALE: {Math.round(scale * 100)}%</span>
+           {/* Status Controls (Bottom Right - Zoom & Search) */}
+           <div className="absolute bottom-10 right-8 flex flex-col items-end pointer-events-none z-40">
+              <div className="pointer-events-auto flex items-center gap-2">
+                  {/* Toolbar Row */}
+                  <div className="flex bg-black/80 backdrop-blur-sm border border-neutral-800 rounded overflow-hidden shadow-xl items-center h-8">
+                      {/* Search / Command */}
+                      <button 
+                        onClick={() => setIsCmdPaletteOpen(true)}
+                        className="flex items-center gap-2 px-3 h-full hover:bg-neutral-800 text-neutral-400 hover:text-white transition-colors border-r border-neutral-800"
+                        title="Command Palette (Cmd+K)"
+                      >
+                         <Search size={14} />
+                         <span className="text-[10px] font-mono font-bold hidden sm:inline">CMD+K</span>
+                      </button>
+
+                      <button onClick={() => setScale(s => Math.max(0.2, s - 0.2))} className="w-8 h-full flex items-center justify-center hover:bg-neutral-800 text-neutral-400 hover:text-white transition-colors border-r border-neutral-800"><ZoomOut size={14} /></button>
+                      <button onClick={() => setScale(s => Math.min(3, s + 0.2))} className="w-8 h-full flex items-center justify-center hover:bg-neutral-800 text-neutral-400 hover:text-white transition-colors"><ZoomIn size={14} /></button>
                   </div>
-                  <div className="flex bg-black/80 backdrop-blur-sm border border-neutral-800 rounded overflow-hidden shadow-xl">
-                      <button onClick={() => setScale(s => Math.max(0.2, s - 0.2))} className="p-2 hover:bg-neutral-800 text-neutral-400 hover:text-white transition-colors"><ZoomOut size={16} /></button>
-                      <div className="w-px bg-neutral-800"></div>
-                      <button onClick={() => setScale(s => Math.min(3, s + 0.2))} className="p-2 hover:bg-neutral-800 text-neutral-400 hover:text-white transition-colors"><ZoomIn size={16} /></button>
-                  </div>
-              </div>
-              <div className="mt-4 flex flex-col items-end gap-1 text-[9px] font-mono text-neutral-700">
-                  <span>CMD+K TO SEARCH</span>
-                  <span>DRAG TO PAN</span>
               </div>
            </div>
+
+           {/* Bottom Status Bar */}
+           <StatusBar 
+              panOffset={panOffset} 
+              scale={scale} 
+              activeContextId={activeContextId}
+           />
 
            {/* Command Palette */}
            <CommandPalette 
@@ -475,13 +490,13 @@ const App: React.FC = () => {
 
         {/* Dynamic Context Borders */}
         {CONTEXTS.map(ctx => {
-            const bounds = getContextBounds(ctx.id);
+            const bounds = contextBounds[ctx.id];
             if (!bounds) return null;
 
             return (
                 <div 
                     key={ctx.id}
-                    className="absolute border transition-all duration-500 ease-in-out pointer-events-none rounded-lg"
+                    className="absolute border transition-colors duration-300 pointer-events-none rounded-lg"
                     style={{
                         left: bounds.x + panOffset.x, 
                         top: bounds.y + panOffset.y,

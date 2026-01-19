@@ -5,12 +5,13 @@ interface MinimapProps {
   windows: WindowState[];
   viewport: { x: number; y: number; width: number; height: number };
   panOffset: { x: number; y: number };
+  appScale: number;
   onNavigate: (x: number, y: number) => void;
   width?: number;
   height?: number;
 }
 
-const Minimap: React.FC<MinimapProps> = ({ windows, viewport, panOffset, onNavigate, width, height }) => {
+const Minimap: React.FC<MinimapProps> = ({ windows, viewport, panOffset, appScale, onNavigate, width, height }) => {
   // Minimap scale factor (e.g., 0.1 means 1000px world = 100px minimap)
   const SCALE = 0.08;
   
@@ -42,8 +43,10 @@ const Minimap: React.FC<MinimapProps> = ({ windows, viewport, panOffset, onNavig
     };
 
     const handleMouseUp = () => {
-      setIsDragging(false);
-      document.body.style.cursor = 'default';
+      if (isDragging) {
+          setIsDragging(false);
+          document.body.style.cursor = 'default';
+      }
     };
 
     if (isDragging) {
@@ -58,7 +61,7 @@ const Minimap: React.FC<MinimapProps> = ({ windows, viewport, panOffset, onNavig
   }, [isDragging, onNavigate, panOffset]);
 
   const handleMinimapClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    // Prevent jumping if we just finished dragging
+    // Safety check
     if (isDragging) return;
 
     const rect = e.currentTarget.getBoundingClientRect();
@@ -68,14 +71,15 @@ const Minimap: React.FC<MinimapProps> = ({ windows, viewport, panOffset, onNavig
     const worldTargetX = (clickX - mapCenter.x) / SCALE;
     const worldTargetY = (clickY - mapCenter.y) / SCALE;
 
-    const newPanX = -worldTargetX + (viewport.width / 2);
-    const newPanY = -worldTargetY + (viewport.height / 2);
+    const newPanX = (viewport.width / 2 / appScale) - worldTargetX;
+    const newPanY = (viewport.height / 2 / appScale) - worldTargetY;
 
     onNavigate(newPanX, newPanY);
   };
 
   const handleViewportMouseDown = (e: React.MouseEvent) => {
-    e.stopPropagation(); // Prevent triggering the map click
+    e.stopPropagation();
+    e.preventDefault(); // Prevent text selection
     setIsDragging(true);
     lastMouseRef.current = { x: e.clientX, y: e.clientY };
     document.body.style.cursor = 'grabbing';
@@ -122,20 +126,24 @@ const Minimap: React.FC<MinimapProps> = ({ windows, viewport, panOffset, onNavig
             );
         })}
 
-        {/* Viewport Rect - Now Draggable */}
+        {/* Viewport Rect */}
         {(() => {
             const vpWorldX = -panOffset.x;
             const vpWorldY = -panOffset.y;
             
             const vpMiniX = (vpWorldX * SCALE) + mapCenter.x;
             const vpMiniY = (vpWorldY * SCALE) + mapCenter.y;
-            const vpMiniW = viewport.width * SCALE;
-            const vpMiniH = viewport.height * SCALE;
+            
+            const vpWorldW = viewport.width / appScale;
+            const vpWorldH = viewport.height / appScale;
+
+            const vpMiniW = vpWorldW * SCALE;
+            const vpMiniH = vpWorldH * SCALE;
 
             return (
                 <div 
-                    className={`absolute border-2 border-white/50 shadow-[0_0_20px_rgba(255,255,255,0.2)] 
-                      ${isDragging ? 'cursor-grabbing bg-white/5' : 'cursor-grab hover:bg-white/5'}
+                    className={`absolute border-2 border-white/40 shadow-[0_0_20px_rgba(255,255,255,0.1)] 
+                      ${isDragging ? 'cursor-grabbing bg-white/10' : 'cursor-grab hover:bg-white/5'}
                       transition-colors pointer-events-auto`}
                     style={{
                         left: vpMiniX,
@@ -144,17 +152,18 @@ const Minimap: React.FC<MinimapProps> = ({ windows, viewport, panOffset, onNavig
                         height: vpMiniH
                     }}
                     onMouseDown={handleViewportMouseDown}
+                    onClick={(e) => e.stopPropagation()} 
                 >
-                    <div className="absolute top-0 right-0 -mt-3 text-[8px] text-white/50 font-mono pointer-events-none">VIEW</div>
+                    <div className="absolute top-0 right-0 -mt-3 text-[8px] text-white/50 font-mono pointer-events-none select-none">VIEW</div>
                 </div>
             );
         })()}
       </div>
       
       {/* Footer Info */}
-      <div className="h-6 border-t border-neutral-800 bg-neutral-900 flex items-center justify-between px-2 text-[10px] text-neutral-500 font-mono">
+      <div className="h-6 border-t border-neutral-800 bg-neutral-900 flex items-center justify-between px-2 text-[10px] text-neutral-500 font-mono select-none">
         <span>PAN: {panOffset.x.toFixed(0)},{panOffset.y.toFixed(0)}</span>
-        <span>{isDragging ? 'DRAGGING' : 'READY'}</span>
+        <span className={isDragging ? 'text-emerald-500' : ''}>{isDragging ? 'DRAGGING' : 'READY'}</span>
       </div>
     </div>
   );
