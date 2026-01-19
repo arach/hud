@@ -45,10 +45,7 @@ import {
   MicOff
 } from 'lucide-react';
 
-import ApiKeyModal from './components/ApiKeyModal';
-
 const generateId = () => Math.random().toString(36).substring(2, 9);
-
 
 // -- Context Definitions --
 // Compacted layout coordinates for better centering on laptop screens
@@ -92,9 +89,6 @@ const App: React.FC = () => {
   // -- Terminal State --
   const [isTerminalOpen, setIsTerminalOpen] = useState(false);
   const [isTerminalMaximized, setIsTerminalMaximized] = useState(false);
-
-  const [hasApiKey, setHasApiKey] = useState(false);
-  const [isApiKeyModalOpen, setIsApiKeyModalOpen] = useState(false);
 
   // -- Window Management --
   const [windows, setWindows] = useState<WindowState[]>(INITIAL_WINDOWS);
@@ -143,29 +137,11 @@ const App: React.FC = () => {
 
   // -- Effects --
   useEffect(() => {
-    // Check for API Key on mount
-    const storedKey = localStorage.getItem('GEMINI_API_KEY');
-    const envKey = process.env.API_KEY;
-    
-    if (storedKey || envKey) {
-        setHasApiKey(true);
-        // Ensure service is initialized if using stored key
-        if (storedKey && !geminiService.isConfigured()) {
-            geminiService.initialize(storedKey);
-        }
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!hasApiKey) return;
-
     geminiService.startChat(messages.slice(1).map(m => ({
         role: m.role,
         parts: [{ text: m.content }]
     })));
-  }, [hasApiKey, messages]); // Added messages dependency to ensure correct history on init if messages change
 
-  useEffect(() => {
     const handleResize = () => {
         setViewport({ width: window.innerWidth, height: window.innerHeight });
     };
@@ -332,21 +308,6 @@ const App: React.FC = () => {
       }, 0);
   }, [viewport, scale]);
 
-  const handleSaveKey = (key: string) => {
-    localStorage.setItem('GEMINI_API_KEY', key);
-    geminiService.initialize(key);
-    setHasApiKey(true);
-    setIsApiKeyModalOpen(false);
-  };
-  
-  const checkApiKey = useCallback(() => {
-      if (!hasApiKey) {
-          setIsApiKeyModalOpen(true);
-          return false;
-      }
-      return true;
-  }, [hasApiKey]);
-
   const focusWindow = useCallback((id: string) => {
       // Special handling for terminal which is now a drawer
       if (id === 'terminal') {
@@ -457,14 +418,11 @@ When the user asks to "go to" or "show" something, use the appropriate tool.
   });
 
   const toggleVoice = () => {
-      if (!checkApiKey()) return;
       if (isVoiceConnected) disconnectVoice();
       else connectVoice();
   };
 
   const handleSendMessage = async (text: string) => {
-    if (!checkApiKey()) return;
-
     const userMsg: Message = {
       id: generateId(),
       role: 'user',
@@ -541,19 +499,16 @@ When the user asks to "go to" or "show" something, use the appropriate tool.
     { id: 'focus-pipeline', label: 'Focus CI/CD Pipeline', action: () => focusWindow('pipeline'), icon: <Workflow size={16} /> },
   ];
 
-  // Dynamic style for HUD elements
-  // Reduced non-terminal offset to 32px (was 40px) to close gap with 28px status bar
-  const hudBottomOffset = isTerminalOpen && !isTerminalMaximized ? '360px' : '32px';
+  // Compact Mode Logic: Activated if Terminal or Voice is active
+  const isCompactMode = isTerminalOpen || isVoiceConnected;
 
   return (
-    <>
-    <ApiKeyModal isOpen={isApiKeyModalOpen} onSave={handleSaveKey} />
     <HUDFrame 
       panOffset={panOffset} 
       scale={scale} 
       onPan={handlePan} 
       onZoom={handleZoom}
-      // -- HUD LAYER (Fixed positioning, no scaling) --
+      // -- HUD LAYER (Fixed positioning) --
       hud={
         <>
            {/* Top Context Bar */}
@@ -573,78 +528,86 @@ When the user asks to "go to" or "show" something, use the appropriate tool.
               onArrange={handleArrangeContext}
            />
 
-           {/* Minimap */}
-           <div 
-              className="absolute left-8 pointer-events-auto shadow-2xl border border-neutral-800 bg-black z-40 transition-all duration-300 ease-in-out"
-              style={{ bottom: hudBottomOffset }}
-           >
-             <div className="w-[200px] h-[150px]">
-                 <Minimap 
-                    windows={windows} 
-                    viewport={{ ...viewport, x: -panOffset.x, y: -panOffset.y }} 
-                    panOffset={panOffset} 
-                    appScale={scale}
-                    onNavigate={handleNavigate} 
-                    width={200} 
-                    height={150} 
-                />
+           {/* Minimap - Hidden in Compact Mode */}
+           {!isCompactMode && (
+             <div 
+                className="fixed left-8 bottom-8 pointer-events-auto shadow-2xl border border-neutral-800 bg-black z-50 transition-all duration-300 ease-in-out"
+             >
+               <div className="w-[200px] h-[150px]">
+                   <Minimap 
+                      windows={windows} 
+                      viewport={{ ...viewport, x: -panOffset.x, y: -panOffset.y }} 
+                      panOffset={panOffset} 
+                      appScale={scale}
+                      onNavigate={handleNavigate} 
+                      width={200} 
+                      height={150} 
+                  />
+               </div>
              </div>
-           </div>
+           )}
 
-           {/* Status Controls (Toolbar) */}
+           {/* Voice HUD Log - Position dynamically based on Terminal state */}
            <div 
-              className="absolute right-8 flex flex-col items-end pointer-events-none z-40 transition-all duration-300 ease-in-out"
-              style={{ bottom: hudBottomOffset }}
+              className={`fixed right-8 pointer-events-none z-50 transition-all duration-300 ease-in-out flex flex-col items-end ${
+                  isTerminalOpen ? 'bottom-[340px]' : 'bottom-24'
+              }`}
            >
-              {/* Voice HUD Log - Shows only when terminal is closed and voice is active */}
-              <div className="mb-4 flex flex-col items-end pointer-events-auto">
-                   <VoiceLog transcripts={transcripts} visible={isVoiceConnected && !isTerminalOpen} />
-              </div>
-
-              <div className="pointer-events-auto flex items-center gap-2">
-                  <div className="flex bg-black/80 backdrop-blur-sm border border-neutral-800 rounded overflow-hidden shadow-xl items-center h-8">
-                      {/* Search / Command */}
-                      <button 
-                        onClick={() => setIsCmdPaletteOpen(true)}
-                        className="flex items-center gap-2 px-3 h-full hover:bg-neutral-800 text-neutral-400 hover:text-white transition-colors border-r border-neutral-800"
-                        title="Command Palette (Cmd+K)"
-                      >
-                         <Search size={14} />
-                         <span className="text-[10px] font-mono font-bold hidden sm:inline">CMD+K</span>
-                      </button>
-
-                      {/* Global Voice Toggle */}
-                      <button 
-                        onClick={toggleVoice}
-                        className={`w-10 h-full flex items-center justify-center transition-colors border-r border-neutral-800 ${
-                            isVoiceConnected 
-                              ? 'bg-emerald-900/30 text-emerald-500 animate-pulse' 
-                              : 'hover:bg-neutral-800 text-neutral-400 hover:text-white'
-                        }`}
-                        title={isVoiceConnected ? "Disconnect Voice" : "Enable Voice Link"}
-                      >
-                         {isVoiceConnected ? <Mic size={14} /> : <MicOff size={14} />}
-                         {isVoiceConnected && (
-                            <div className="absolute top-1 right-1 w-1.5 h-1.5 bg-emerald-500 rounded-full animate-ping" />
-                         )}
-                      </button>
-
-                      {/* Terminal Toggle */}
-                      <button 
-                        onClick={() => setIsTerminalOpen(p => !p)}
-                        className={`w-10 h-full flex items-center justify-center transition-colors border-r border-neutral-800 ${
-                            isTerminalOpen ? 'bg-neutral-800 text-white' : 'hover:bg-neutral-800 text-neutral-400 hover:text-white'
-                        }`}
-                        title="Toggle Terminal (Ctrl+`)"
-                      >
-                         {isTerminalOpen ? <ChevronUp size={14} className="rotate-180" /> : <Terminal size={14} />}
-                      </button>
-
-                      <button onClick={() => setScale(s => Math.max(0.2, s - 0.2))} className="w-8 h-full flex items-center justify-center hover:bg-neutral-800 text-neutral-400 hover:text-white transition-colors border-r border-neutral-800"><ZoomOut size={14} /></button>
-                      <button onClick={() => setScale(s => Math.min(3, s + 0.2))} className="w-8 h-full flex items-center justify-center hover:bg-neutral-800 text-neutral-400 hover:text-white transition-colors"><ZoomIn size={14} /></button>
-                  </div>
-              </div>
+                <div className="pointer-events-auto">
+                    <VoiceLog transcripts={transcripts} visible={isVoiceConnected} />
+                </div>
            </div>
+
+           {/* Status Controls (Toolbar) - Hidden in Compact Mode */}
+           {!isCompactMode && (
+             <div 
+                className="fixed right-8 bottom-8 flex flex-col items-end pointer-events-none z-50 transition-all duration-300 ease-in-out"
+             >
+                <div className="pointer-events-auto flex items-center gap-2">
+                    <div className="flex bg-black/80 backdrop-blur-sm border border-neutral-800 rounded overflow-hidden shadow-xl items-center h-8">
+                        {/* Search / Command */}
+                        <button 
+                          onClick={() => setIsCmdPaletteOpen(true)}
+                          className="flex items-center gap-2 px-3 h-full hover:bg-neutral-800 text-neutral-400 hover:text-white transition-colors border-r border-neutral-800"
+                          title="Command Palette (Cmd+K)"
+                        >
+                           <Search size={14} />
+                           <span className="text-[10px] font-mono font-bold hidden sm:inline">CMD+K</span>
+                        </button>
+
+                        {/* Global Voice Toggle */}
+                        <button 
+                          onClick={toggleVoice}
+                          className={`w-10 h-full flex items-center justify-center transition-colors border-r border-neutral-800 ${
+                              isVoiceConnected 
+                                ? 'bg-emerald-900/30 text-emerald-500 animate-pulse' 
+                                : 'hover:bg-neutral-800 text-neutral-400 hover:text-white'
+                          }`}
+                          title={isVoiceConnected ? "Disconnect Voice" : "Enable Voice Link"}
+                        >
+                           {isVoiceConnected ? <Mic size={14} /> : <MicOff size={14} />}
+                           {isVoiceConnected && (
+                              <div className="absolute top-1 right-1 w-1.5 h-1.5 bg-emerald-500 rounded-full animate-ping" />
+                           )}
+                        </button>
+
+                        {/* Terminal Toggle */}
+                        <button 
+                          onClick={() => setIsTerminalOpen(p => !p)}
+                          className={`w-10 h-full flex items-center justify-center transition-colors border-r border-neutral-800 ${
+                              isTerminalOpen ? 'bg-neutral-800 text-white' : 'hover:bg-neutral-800 text-neutral-400 hover:text-white'
+                          }`}
+                          title="Toggle Terminal (Ctrl+`)"
+                        >
+                           {isTerminalOpen ? <ChevronUp size={14} className="rotate-180" /> : <Terminal size={14} />}
+                        </button>
+
+                        <button onClick={() => setScale(s => Math.max(0.2, s - 0.2))} className="w-8 h-full flex items-center justify-center hover:bg-neutral-800 text-neutral-400 hover:text-white transition-colors border-r border-neutral-800"><ZoomOut size={14} /></button>
+                        <button onClick={() => setScale(s => Math.min(3, s + 0.2))} className="w-8 h-full flex items-center justify-center hover:bg-neutral-800 text-neutral-400 hover:text-white transition-colors"><ZoomIn size={14} /></button>
+                    </div>
+                </div>
+             </div>
+           )}
 
            {/* Terminal Drawer */}
            <TerminalDrawer 
@@ -660,16 +623,19 @@ When the user asks to "go to" or "show" something, use the appropriate tool.
                 isLoading={isProcessing} 
                 isConnected={isVoiceConnected}
                 transcripts={transcripts}
-                onRequireAuth={checkApiKey}
               />
            </TerminalDrawer>
 
-           {/* Bottom Status Bar */}
+           {/* Bottom Status Bar - handles compact toggles */}
            <StatusBar 
               panOffset={panOffset} 
               scale={scale} 
               activeContextId={activeContextId}
               isVoiceConnected={isVoiceConnected}
+              isCompact={isCompactMode}
+              onToggleTerminal={() => setIsTerminalOpen(p => !p)}
+              onToggleVoice={toggleVoice}
+              isTerminalOpen={isTerminalOpen}
            />
 
            {/* Command Palette */}
@@ -742,7 +708,6 @@ When the user asks to "go to" or "show" something, use the appropriate tool.
         ))}
 
     </HUDFrame>
-    </>
   );
 };
 

@@ -21,11 +21,10 @@ const TerminalDrawer: React.FC<TerminalDrawerProps> = ({
   return (
     <div 
       className={`
-        absolute left-0 right-0 bg-black shadow-[0_-10px_40px_rgba(0,0,0,0.8)] transition-all duration-300 ease-in-out z-40 flex flex-col border-t border-neutral-800
+        fixed left-0 right-0 bg-black shadow-[0_-10px_40px_rgba(0,0,0,0.8)] transition-all duration-300 ease-in-out z-40 flex flex-col border-t border-neutral-800 bottom-7
         ${isOpen ? 'translate-y-0 opacity-100' : 'translate-y-full opacity-0 pointer-events-none'}
       `}
       style={{
-        bottom: '28px', // Height of status bar
         height: isMaximized ? 'calc(100% - 28px)' : '320px' 
       }}
     >

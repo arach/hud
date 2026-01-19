@@ -18,7 +18,7 @@ interface ContextBarProps {
 
 const ContextBar: React.FC<ContextBarProps> = ({ contexts, activeContextId, onSelect }) => {
   return (
-    <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-2 pointer-events-auto">
+    <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-2 pointer-events-auto">
       <div className="flex bg-black/80 backdrop-blur-md border border-neutral-800 rounded-full p-1.5 shadow-2xl gap-1">
         {contexts.map((ctx) => {
             const isActive = activeContextId === ctx.id;

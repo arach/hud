@@ -14,9 +14,11 @@ interface ContextDockProps {
 
 const ContextDock: React.FC<ContextDockProps> = ({ contexts, activeContextId, onSelect, windows, onGather, onArrange }) => {
   return (
-    <div className="absolute left-6 top-1/2 -translate-y-1/2 z-50 flex flex-col gap-4 pointer-events-auto">
+    <div 
+        className="fixed left-6 top-1/2 -translate-y-1/2 z-50 flex flex-col gap-4 pointer-events-auto max-h-[calc(100vh-8rem)]"
+    >
       {/* Main Dock Pill */}
-      <div className="flex flex-col bg-black/80 backdrop-blur-xl border border-neutral-800 rounded-full py-3 px-2 shadow-2xl gap-3">
+      <div className="flex flex-col bg-black/80 backdrop-blur-xl border border-neutral-800 rounded-full py-3 px-2 shadow-2xl gap-3 overflow-y-auto overflow-x-hidden no-scrollbar">
         
         {/* Context Navigation */}
         {contexts.map((ctx) => {
@@ -24,7 +26,7 @@ const ContextDock: React.FC<ContextDockProps> = ({ contexts, activeContextId, on
             const count = windows.filter(w => w.contextId === ctx.id).length;
             
             return (
-                <div key={ctx.id} className="relative group flex items-center justify-center">
+                <div key={ctx.id} className="relative group flex items-center justify-center shrink-0">
                     {/* Tooltip (Left side) */}
                     <div className="absolute left-full ml-4 px-2 py-1 bg-neutral-900 border border-neutral-800 rounded text-[10px] text-neutral-300 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50">
                         {ctx.label}
@@ -62,12 +64,12 @@ const ContextDock: React.FC<ContextDockProps> = ({ contexts, activeContextId, on
             );
         })}
 
-        <div className="w-full h-px bg-neutral-800/50 my-1"></div>
+        <div className="w-full h-px bg-neutral-800/50 my-1 shrink-0"></div>
 
         {/* Intra-Context Tools */}
         
         {/* Action: Gather Windows */}
-        <div className="relative group flex items-center justify-center">
+        <div className="relative group flex items-center justify-center shrink-0">
              <div className="absolute left-full ml-4 px-2 py-1 bg-neutral-900 border border-neutral-800 rounded text-[10px] text-neutral-300 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50">
                 Gather Windows (Magnet)
              </div>
@@ -80,7 +82,7 @@ const ContextDock: React.FC<ContextDockProps> = ({ contexts, activeContextId, on
         </div>
 
         {/* Action: Arrange Grid */}
-        <div className="relative group flex items-center justify-center">
+        <div className="relative group flex items-center justify-center shrink-0">
              <div className="absolute left-full ml-4 px-2 py-1 bg-neutral-900 border border-neutral-800 rounded text-[10px] text-neutral-300 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50">
                 Arrange Grid
              </div>

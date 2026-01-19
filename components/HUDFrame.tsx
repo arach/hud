@@ -42,7 +42,7 @@ const HUDFrame: React.FC<HUDFrameProps> = ({ children, hud, panOffset, scale, on
       </div>
 
       {/* Static HUD Layer - Fixed viewport coordinates */}
-      <div className="absolute inset-0 z-50 pointer-events-none overflow-hidden">
+      <div className="fixed inset-0 z-50 pointer-events-none overflow-hidden">
         {hud}
       </div>
     </div>
