@@ -8,7 +8,13 @@ interface Transcript {
     isFinal: boolean;
 }
 
-export const useLiveSession = () => {
+interface UseLiveSessionProps {
+    onToolCall?: (name: string, args: any) => Promise<any>;
+    systemInstruction?: string;
+    tools?: any[];
+}
+
+export const useLiveSession = ({ onToolCall, systemInstruction, tools }: UseLiveSessionProps = {}) => {
     const [isConnected, setIsConnected] = useState(false);
     const [isTalking, setIsTalking] = useState(false); // Model is talking
     const [volume, setVolume] = useState(0);
@@ -29,14 +35,9 @@ export const useLiveSession = () => {
 
     // Connect to Gemini Live
     const connect = useCallback(async () => {
-        let apiKey = process.env.API_KEY;
-        
+        const apiKey = process.env.API_KEY;
         if (!apiKey) {
-            apiKey = localStorage.getItem('GEMINI_API_KEY') || undefined;
-        }
-
-        if (!apiKey) {
-            console.error("No API key found in Env or Storage");
+            console.error("No API key found");
             return;
         }
 
@@ -117,6 +118,31 @@ export const useLiveSession = () => {
                             setIsTalking(false);
                         }
 
+                        // Handle Tool Calls
+                        if (msg.toolCall) {
+                            const functionResponses = [];
+                            for (const fc of msg.toolCall.functionCalls) {
+                                let result: any = { result: 'ok' };
+                                if (onToolCall) {
+                                    try {
+                                        console.log(`Executing tool: ${fc.name}`, fc.args);
+                                        result = await onToolCall(fc.name, fc.args);
+                                    } catch (e: any) {
+                                        console.error(`Tool error: ${fc.name}`, e);
+                                        result = { error: e.message || 'Unknown error' };
+                                    }
+                                }
+                                functionResponses.push({
+                                    id: fc.id,
+                                    name: fc.name,
+                                    response: result
+                                });
+                            }
+                            sessionPromiseRef.current?.then(session => {
+                                session.sendToolResponse({ functionResponses });
+                            });
+                        }
+
                         // Handle Audio Output
                         const audioData = msg.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data;
                         if (audioData) {
@@ -153,14 +179,16 @@ export const useLiveSession = () => {
                 config: {
                    responseModalities: [Modality.AUDIO],
                    inputAudioTranscription: {},
-                   outputAudioTranscription: {}
+                   outputAudioTranscription: {},
+                   systemInstruction: systemInstruction,
+                   tools: tools ? [{ functionDeclarations: tools }] : undefined
                 }
             });
 
         } catch (error) {
             console.error("Failed to connect", error);
         }
-    }, []);
+    }, [onToolCall, systemInstruction, tools]);
 
     const disconnect = useCallback(() => {
         setIsConnected(false);
@@ -190,7 +218,7 @@ export const useLiveSession = () => {
         }
 
         // Close Session
-        sessionPromiseRef.current?.then(session => session.close()); // Assume close method exists or just drop ref
+        sessionPromiseRef.current?.then(session => session.close()); 
         sessionPromiseRef.current = null;
     }, []);
 

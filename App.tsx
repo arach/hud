@@ -4,7 +4,9 @@ import ChatInterface from './components/ChatInterface';
 import TaskManager from './components/TaskManager';
 import Minimap from './components/Minimap';
 import StatusBar from './components/StatusBar';
+import VoiceLog from './components/VoiceLog';
 import DraggableWindow from './components/DraggableWindow';
+import TerminalDrawer from './components/TerminalDrawer';
 import DbSchema from './components/tools/DbSchema';
 import ArchDiagram from './components/tools/ArchDiagram';
 import CodeEditor from './components/tools/CodeEditor';
@@ -20,7 +22,8 @@ import ContextBar, { ContextDef } from './components/ContextBar';
 import ContextDock from './components/ContextDock';
 import { Message, Task, WindowState } from './types';
 import { geminiService } from './services/geminiService';
-import { MOCK_TASKS } from './constants';
+import { MOCK_TASKS, INITIAL_SYSTEM_INSTRUCTION, HUD_TOOLS } from './constants';
+import { useLiveSession } from './hooks/useLiveSession';
 import { 
   LayoutTemplate, 
   Terminal, 
@@ -37,41 +40,41 @@ import {
   PenTool,
   Server,
   Search,
+  ChevronUp,
+  Mic,
+  MicOff
 } from 'lucide-react';
-
-import ApiKeyModal from './components/ApiKeyModal';
 
 const generateId = () => Math.random().toString(36).substring(2, 9);
 
 // -- Context Definitions --
-// Used for metadata and identity. Initial positions are derived from windows.
+// Compacted layout coordinates for better centering on laptop screens
 const CONTEXTS: ContextDef[] = [
   { id: 'dev', label: 'DEV CORE', x: 0, y: 0, color: '#10b981', icon: <Code2 size={18} /> },
-  { id: 'design', label: 'BLUEPRINTS', x: 2200, y: 0, color: '#3b82f6', icon: <PenTool size={18} /> },
+  { id: 'design', label: 'BLUEPRINTS', x: 1800, y: 0, color: '#3b82f6', icon: <PenTool size={18} /> },
   { id: 'ops', label: 'SYSTEM OPS', x: 0, y: 1400, color: '#f59e0b', icon: <Server size={18} /> },
-  { id: 'studio', label: 'VISUAL STUDIO', x: 2200, y: 1400, color: '#8b5cf6', icon: <Monitor size={18} /> },
+  { id: 'studio', label: 'VISUAL STUDIO', x: 1800, y: 1400, color: '#8b5cf6', icon: <Monitor size={18} /> },
 ];
 
 const INITIAL_WINDOWS: WindowState[] = [
-    // --- DEV CORE ---
-    { id: 'code', contextId: 'dev', title: 'Code Editor', x: 50, y: 100, w: 800, h: 600, zIndex: 10 },
-    { id: 'terminal', contextId: 'dev', title: 'Agent CLI', x: 900, y: 100, w: 500, h: 600, zIndex: 11 },
-    { id: 'docs', contextId: 'dev', title: 'Documentation', x: 1450, y: 100, w: 450, h: 600, zIndex: 9 },
-    { id: 'tasks', contextId: 'dev', title: 'Mission Control', x: 50, y: 750, w: 400, h: 400, zIndex: 10 },
+    // --- DEV CORE (Top Left) ---
+    { id: 'code', contextId: 'dev', title: 'Code Editor', x: 100, y: 100, w: 800, h: 600, zIndex: 10 },
+    { id: 'docs', contextId: 'dev', title: 'Documentation', x: 950, y: 100, w: 450, h: 600, zIndex: 9 },
+    { id: 'tasks', contextId: 'dev', title: 'Mission Control', x: 100, y: 750, w: 400, h: 400, zIndex: 10 },
 
-    // --- BLUEPRINTS ---
-    { id: 'db', contextId: 'design', title: 'Schema Designer', x: 2250, y: 100, w: 700, h: 500, zIndex: 10 },
-    { id: 'arch', contextId: 'design', title: 'Architecture', x: 3000, y: 100, w: 700, h: 500, zIndex: 10 },
-    { id: 'git', contextId: 'design', title: 'Source Control', x: 2250, y: 650, w: 600, h: 450, zIndex: 10 },
+    // --- BLUEPRINTS (Top Right) ---
+    { id: 'db', contextId: 'design', title: 'Schema Designer', x: 1800, y: 100, w: 700, h: 500, zIndex: 10 },
+    { id: 'arch', contextId: 'design', title: 'Architecture', x: 2550, y: 100, w: 700, h: 500, zIndex: 10 },
+    { id: 'git', contextId: 'design', title: 'Source Control', x: 1800, y: 650, w: 600, h: 450, zIndex: 10 },
 
-    // --- SYSTEM OPS ---
-    { id: 'pipeline', contextId: 'ops', title: 'CI/CD Pipeline', x: 50, y: 1500, w: 800, h: 400, zIndex: 10 },
-    { id: 'process', contextId: 'ops', title: 'Process Dashboard', x: 900, y: 1500, w: 500, h: 400, zIndex: 10 },
-    { id: 'logs', contextId: 'ops', title: 'System Logs', x: 50, y: 1950, w: 800, h: 400, zIndex: 10 },
+    // --- SYSTEM OPS (Bottom Left) ---
+    { id: 'pipeline', contextId: 'ops', title: 'CI/CD Pipeline', x: 100, y: 1400, w: 800, h: 400, zIndex: 10 },
+    { id: 'process', contextId: 'ops', title: 'Process Dashboard', x: 950, y: 1400, w: 500, h: 400, zIndex: 10 },
+    { id: 'logs', contextId: 'ops', title: 'System Logs', x: 100, y: 1850, w: 800, h: 400, zIndex: 10 },
 
-    // --- VISUAL STUDIO ---
-    { id: 'ui', contextId: 'studio', title: 'UI Preview', x: 2250, y: 1500, w: 900, h: 600, zIndex: 11 },
-    { id: 'diff', contextId: 'studio', title: 'Diff Viewer', x: 3200, y: 1500, w: 600, h: 600, zIndex: 10 },
+    // --- VISUAL STUDIO (Bottom Right) ---
+    { id: 'ui', contextId: 'studio', title: 'UI Preview', x: 1800, y: 1400, w: 900, h: 600, zIndex: 11 },
+    { id: 'diff', contextId: 'studio', title: 'Diff Viewer', x: 2750, y: 1400, w: 600, h: 600, zIndex: 10 },
 ];
 
 const App: React.FC = () => {
@@ -82,7 +85,10 @@ const App: React.FC = () => {
   const [selectedWindowId, setSelectedWindowId] = useState<string | null>(null);
   const [isCmdPaletteOpen, setIsCmdPaletteOpen] = useState(false);
   const [activeContextId, setActiveContextId] = useState<string>('dev');
-  const [hasApiKey, setHasApiKey] = useState(false);
+  
+  // -- Terminal State --
+  const [isTerminalOpen, setIsTerminalOpen] = useState(false);
+  const [isTerminalMaximized, setIsTerminalMaximized] = useState(false);
 
   // -- Window Management --
   const [windows, setWindows] = useState<WindowState[]>(INITIAL_WINDOWS);
@@ -100,7 +106,6 @@ const App: React.FC = () => {
   const [isProcessing, setIsProcessing] = useState(false);
 
   // -- Helpers --
-  // Memoized bounds calculation to prevent lag during re-renders
   const contextBounds = useMemo(() => {
     const bounds: Record<string, { x: number; y: number; w: number; h: number } | null> = {};
     const padding = 60;
@@ -132,29 +137,11 @@ const App: React.FC = () => {
 
   // -- Effects --
   useEffect(() => {
-    // Check for API Key on mount
-    const storedKey = localStorage.getItem('GEMINI_API_KEY');
-    const envKey = process.env.API_KEY;
-    
-    if (storedKey || envKey) {
-        setHasApiKey(true);
-        // Ensure service is initialized if using stored key
-        if (storedKey && !geminiService.isConfigured()) {
-            geminiService.initialize(storedKey);
-        }
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!hasApiKey) return;
-
     geminiService.startChat(messages.slice(1).map(m => ({
         role: m.role,
         parts: [{ text: m.content }]
     })));
-  }, [hasApiKey]);
 
-  useEffect(() => {
     const handleResize = () => {
         setViewport({ width: window.innerWidth, height: window.innerHeight });
     };
@@ -163,6 +150,10 @@ const App: React.FC = () => {
         if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
             e.preventDefault();
             setIsCmdPaletteOpen(prev => !prev);
+        }
+        if (e.ctrlKey && e.key === '`') {
+            e.preventDefault();
+            setIsTerminalOpen(prev => !prev);
         }
     };
 
@@ -182,7 +173,6 @@ const App: React.FC = () => {
     let closest = CONTEXTS[0];
     let minDist = Infinity;
 
-    // Determine context centers dynamically
     const contextCenters = CONTEXTS.map(ctx => {
         const bounds = contextBounds[ctx.id];
         if (bounds) {
@@ -192,7 +182,8 @@ const App: React.FC = () => {
                 y: bounds.y + bounds.h / 2
             };
         }
-        return { id: ctx.id, x: ctx.x + 950, y: ctx.y + 625 };
+        // Fallback center for empty contexts
+        return { id: ctx.id, x: ctx.x + 700, y: ctx.y + 400 }; 
     });
 
     for (const c of contextCenters) {
@@ -248,11 +239,11 @@ const App: React.FC = () => {
           targetX = bounds.x + (bounds.w / 2);
           targetY = bounds.y + (bounds.h / 2);
       } else {
-          targetX = ctx.x + 950;
-          targetY = ctx.y + 625;
+          // Compact fallback for empty contexts
+          targetX = ctx.x + 700;
+          targetY = ctx.y + 400;
       }
 
-      // Center the camera on target
       const targetPanX = (viewport.width / 2 / scale) - targetX;
       const targetPanY = (viewport.height / 2 / scale) - targetY;
       
@@ -261,13 +252,11 @@ const App: React.FC = () => {
   }, [viewport, scale, contextBounds]);
 
   const handleGatherContext = useCallback((contextId: string) => {
-     // Find center of current view
      const centerX = (-panOffset.x) + (viewport.width / 2 / scale);
      const centerY = (-panOffset.y) + (viewport.height / 2 / scale);
 
      setWindows(prev => prev.map(win => {
          if (win.contextId === contextId) {
-             // Cascade
              const offsetX = (Math.random() * 200) - 100;
              const offsetY = (Math.random() * 200) - 100;
              return { ...win, x: centerX + offsetX - (win.w/2), y: centerY + offsetY - (win.h/2) };
@@ -283,24 +272,17 @@ const App: React.FC = () => {
         
         if (ctxWins.length === 0) return prev;
 
-        // Calculate a nice grid based on current view center
-        const centerX = (-panOffset.x) + (viewport.width / 2 / scale);
-        const centerY = (-panOffset.y) + (viewport.height / 2 / scale);
+        // Arrange relative to the current bounding box top-left, or viewport center if undefined
+        const currentBounds = contextBounds[contextId];
+        const startX = currentBounds ? currentBounds.x + 60 : (-panOffset.x) + (viewport.width / 2 / scale) - 400;
+        const startY = currentBounds ? currentBounds.y + 60 : (-panOffset.y) + (viewport.height / 2 / scale) - 300;
         
         const gap = 30;
         const cols = Math.ceil(Math.sqrt(ctxWins.length));
         
-        // Simple grid algorithm
         const arranged = ctxWins.map((w, i) => {
             const col = i % cols;
             const row = Math.floor(i / cols);
-            // Rough centering math
-            const totalW = cols * (800 + gap); // Assuming avg width 800 for centering calc
-            const totalH = Math.ceil(ctxWins.length / cols) * (600 + gap);
-            
-            const startX = centerX - (totalW / 4); 
-            const startY = centerY - (totalH / 4);
-
             return {
                 ...w,
                 x: startX + (col * (w.w + gap)),
@@ -310,20 +292,28 @@ const App: React.FC = () => {
         
         return [...otherWins, ...arranged];
     });
-  }, [panOffset, viewport, scale]);
+  }, [panOffset, viewport, scale, contextBounds]);
 
   const handleAutoLayout = useCallback(() => {
       setWindows(INITIAL_WINDOWS);
-      handleContextSelect(CONTEXTS[0]);
-  }, [handleContextSelect]);
-
-  const handleSaveKey = (key: string) => {
-    localStorage.setItem('GEMINI_API_KEY', key);
-    geminiService.initialize(key);
-    setHasApiKey(true);
-  };
+      // Wait a tick for state update before centering
+      setTimeout(() => {
+          const bounds = { x: 40, y: 60, w: 1400, h: 1100 }; // Approx bounds of Dev Core
+          const targetX = bounds.x + (bounds.w / 2);
+          const targetY = bounds.y + (bounds.h / 2);
+          const targetPanX = (viewport.width / 2 / scale) - targetX;
+          const targetPanY = (viewport.height / 2 / scale) - targetY;
+          setPanOffset({ x: targetPanX, y: targetPanY });
+          setActiveContextId('dev');
+      }, 0);
+  }, [viewport, scale]);
 
   const focusWindow = useCallback((id: string) => {
+      // Special handling for terminal which is now a drawer
+      if (id === 'terminal') {
+          setIsTerminalOpen(true);
+          return;
+      }
       handleWindowSelect(id);
       const win = windows.find(w => w.id === id);
       if (win) {
@@ -357,6 +347,80 @@ const App: React.FC = () => {
     }));
     return found ? "Session marked complete." : "Session ID not found.";
   }, []);
+
+  // -- Tool Execution --
+  const handleToolCall = useCallback(async (name: string, args: any): Promise<any> => {
+      console.log('Tool Executing:', name, args);
+      
+      switch (name) {
+          case 'change_context': {
+              const ctxId = args.contextId;
+              const ctx = CONTEXTS.find(c => c.id === ctxId);
+              if (ctx) {
+                  handleContextSelect(ctx);
+                  return { result: `Switched to ${ctx.label}` };
+              }
+              return { error: 'Context not found' };
+          }
+          case 'focus_window': {
+              const winId = args.windowId;
+              const win = windows.find(w => w.id === winId) || (winId === 'terminal' ? { id: 'terminal' } : null);
+              if (win) {
+                  focusWindow(win.id);
+                  return { result: `Focused window ${winId}` };
+              }
+              return { error: 'Window not found' };
+          }
+          case 'create_task': {
+              const newId = handleTaskCreate({
+                  title: args.title,
+                  priority: args.priority
+              });
+              return { result: `Task created: ${newId}` };
+          }
+          case 'complete_task': {
+              const res = handleTaskComplete(args.taskId);
+              return { result: res };
+          }
+          default:
+              return { error: 'Unknown tool' };
+      }
+  }, [handleContextSelect, focusWindow, handleTaskCreate, handleTaskComplete, windows]);
+
+  const systemInstruction = useMemo(() => {
+     const contextList = CONTEXTS.map(c => `${c.label} (id: ${c.id})`).join(', ');
+     const windowList = windows.map(w => `${w.title} (id: ${w.id}) in ${w.contextId}`).join(', ');
+     const taskList = tasks.map(t => `[${t.id}] ${t.title} (${t.status})`).join(', ');
+     
+     return `
+${INITIAL_SYSTEM_INSTRUCTION}
+
+CURRENT HUD ENVIRONMENT:
+- Available Contexts: ${contextList}
+- Active Windows: ${windowList}
+- Active Tasks: ${taskList}
+
+You can control the HUD using tools:
+- change_context(contextId)
+- focus_window(windowId)
+- create_task(title, priority)
+- complete_task(taskId)
+
+When the user asks to "go to" or "show" something, use the appropriate tool.
+     `;
+  }, [windows, tasks]);
+
+  // -- Voice Session (Hoisted) --
+  const { connect: connectVoice, disconnect: disconnectVoice, isConnected: isVoiceConnected, transcripts, volume } = useLiveSession({
+    onToolCall: handleToolCall,
+    systemInstruction,
+    tools: HUD_TOOLS
+  });
+
+  const toggleVoice = () => {
+      if (isVoiceConnected) disconnectVoice();
+      else connectVoice();
+  };
 
   const handleSendMessage = async (text: string) => {
     const userMsg: Message = {
@@ -397,7 +461,6 @@ const App: React.FC = () => {
 
   const renderWindowContent = (id: string) => {
     switch(id) {
-        case 'terminal': return <ChatInterface messages={messages} onSendMessage={handleSendMessage} isLoading={isProcessing} activeContext={CONTEXTS.find(c => c.id === activeContextId)?.label} />;
         case 'tasks': return <TaskManager tasks={tasks} onComplete={handleTaskComplete} />;
         case 'code': return <CodeEditor />;
         case 'db': return <DbSchema />;
@@ -415,6 +478,8 @@ const App: React.FC = () => {
 
   // -- Command Options --
   const commandList: CommandOption[] = [
+    { id: 'toggle-term', label: 'Toggle Terminal', action: () => setIsTerminalOpen(p => !p), icon: <Terminal size={16} />, shortcut: 'Ctrl+`' },
+    { id: 'toggle-voice', label: 'Toggle Voice Mode', action: toggleVoice, icon: <Mic size={16} /> },
     { id: 'reset', label: 'Auto Layout / Reset View', action: handleAutoLayout, icon: <LayoutTemplate size={16} />, shortcut: '⌘R' },
     { id: 'zoom-in', label: 'Zoom In', action: () => setScale(s => Math.min(3, s + 0.2)), icon: <ZoomIn size={16} /> },
     { id: 'zoom-out', label: 'Zoom Out', action: () => setScale(s => Math.max(0.2, s - 0.2)), icon: <ZoomOut size={16} /> },
@@ -426,7 +491,6 @@ const App: React.FC = () => {
     { id: 'ctx-studio', label: 'Switch to Visual Studio', action: () => handleContextSelect(CONTEXTS[3]), icon: <Monitor size={16} /> },
 
     // Windows
-    { id: 'focus-term', label: 'Focus Terminal', action: () => focusWindow('terminal'), icon: <Terminal size={16} /> },
     { id: 'focus-code', label: 'Focus Code Editor', action: () => focusWindow('code'), icon: <Code size={16} /> },
     { id: 'focus-tasks', label: 'Focus Mission Control', action: () => focusWindow('tasks'), icon: <Layout size={16} /> },
     { id: 'focus-db', label: 'Focus Schema Designer', action: () => focusWindow('db'), icon: <Database size={16} /> },
@@ -435,25 +499,27 @@ const App: React.FC = () => {
     { id: 'focus-pipeline', label: 'Focus CI/CD Pipeline', action: () => focusWindow('pipeline'), icon: <Workflow size={16} /> },
   ];
 
+  // Dynamic style for HUD elements
+  // Reduced non-terminal offset to 32px (was 40px) to close gap with 28px status bar
+  const hudBottomOffset = isTerminalOpen && !isTerminalMaximized ? '360px' : '32px';
+
   return (
-    <>
-      <ApiKeyModal isOpen={!hasApiKey} onSave={handleSaveKey} />
-      <HUDFrame 
-        panOffset={panOffset} 
-        scale={scale} 
-        onPan={handlePan} 
-        onZoom={handleZoom}
-        // -- HUD LAYER (Fixed positioning, no scaling) --
-        hud={
+    <HUDFrame 
+      panOffset={panOffset} 
+      scale={scale} 
+      onPan={handlePan} 
+      onZoom={handleZoom}
+      // -- HUD LAYER (Fixed positioning, no scaling) --
+      hud={
         <>
-           {/* Top Context Bar (Restored) */}
+           {/* Top Context Bar */}
            <ContextBar 
               contexts={CONTEXTS} 
               activeContextId={activeContextId} 
               onSelect={handleContextSelect} 
            />
 
-           {/* Floating Context Dock (Complementary) */}
+           {/* Floating Context Dock */}
            <ContextDock 
               contexts={CONTEXTS} 
               activeContextId={activeContextId} 
@@ -463,8 +529,11 @@ const App: React.FC = () => {
               onArrange={handleArrangeContext}
            />
 
-           {/* Minimap (Bottom Left) */}
-           <div className="absolute bottom-10 left-8 pointer-events-auto shadow-2xl border border-neutral-800 bg-black z-40">
+           {/* Minimap */}
+           <div 
+              className="absolute left-8 pointer-events-auto shadow-2xl border border-neutral-800 bg-black z-40 transition-all duration-300 ease-in-out"
+              style={{ bottom: hudBottomOffset }}
+           >
              <div className="w-[200px] h-[150px]">
                  <Minimap 
                     windows={windows} 
@@ -478,10 +547,17 @@ const App: React.FC = () => {
              </div>
            </div>
 
-           {/* Status Controls (Bottom Right - Zoom & Search) */}
-           <div className="absolute bottom-10 right-8 flex flex-col items-end pointer-events-none z-40">
+           {/* Status Controls (Toolbar) */}
+           <div 
+              className="absolute right-8 flex flex-col items-end pointer-events-none z-40 transition-all duration-300 ease-in-out"
+              style={{ bottom: hudBottomOffset }}
+           >
+              {/* Voice HUD Log - Shows only when terminal is closed and voice is active */}
+              <div className="mb-4 flex flex-col items-end pointer-events-auto">
+                   <VoiceLog transcripts={transcripts} visible={isVoiceConnected && !isTerminalOpen} />
+              </div>
+
               <div className="pointer-events-auto flex items-center gap-2">
-                  {/* Toolbar Row */}
                   <div className="flex bg-black/80 backdrop-blur-sm border border-neutral-800 rounded overflow-hidden shadow-xl items-center h-8">
                       {/* Search / Command */}
                       <button 
@@ -493,17 +569,62 @@ const App: React.FC = () => {
                          <span className="text-[10px] font-mono font-bold hidden sm:inline">CMD+K</span>
                       </button>
 
+                      {/* Global Voice Toggle */}
+                      <button 
+                        onClick={toggleVoice}
+                        className={`w-10 h-full flex items-center justify-center transition-colors border-r border-neutral-800 ${
+                            isVoiceConnected 
+                              ? 'bg-emerald-900/30 text-emerald-500 animate-pulse' 
+                              : 'hover:bg-neutral-800 text-neutral-400 hover:text-white'
+                        }`}
+                        title={isVoiceConnected ? "Disconnect Voice" : "Enable Voice Link"}
+                      >
+                         {isVoiceConnected ? <Mic size={14} /> : <MicOff size={14} />}
+                         {isVoiceConnected && (
+                            <div className="absolute top-1 right-1 w-1.5 h-1.5 bg-emerald-500 rounded-full animate-ping" />
+                         )}
+                      </button>
+
+                      {/* Terminal Toggle */}
+                      <button 
+                        onClick={() => setIsTerminalOpen(p => !p)}
+                        className={`w-10 h-full flex items-center justify-center transition-colors border-r border-neutral-800 ${
+                            isTerminalOpen ? 'bg-neutral-800 text-white' : 'hover:bg-neutral-800 text-neutral-400 hover:text-white'
+                        }`}
+                        title="Toggle Terminal (Ctrl+`)"
+                      >
+                         {isTerminalOpen ? <ChevronUp size={14} className="rotate-180" /> : <Terminal size={14} />}
+                      </button>
+
                       <button onClick={() => setScale(s => Math.max(0.2, s - 0.2))} className="w-8 h-full flex items-center justify-center hover:bg-neutral-800 text-neutral-400 hover:text-white transition-colors border-r border-neutral-800"><ZoomOut size={14} /></button>
                       <button onClick={() => setScale(s => Math.min(3, s + 0.2))} className="w-8 h-full flex items-center justify-center hover:bg-neutral-800 text-neutral-400 hover:text-white transition-colors"><ZoomIn size={14} /></button>
                   </div>
               </div>
            </div>
 
+           {/* Terminal Drawer */}
+           <TerminalDrawer 
+              isOpen={isTerminalOpen} 
+              onClose={() => setIsTerminalOpen(false)}
+              onToggleMaximize={() => setIsTerminalMaximized(p => !p)}
+              isMaximized={isTerminalMaximized}
+              activeContextLabel={CONTEXTS.find(c => c.id === activeContextId)?.label}
+           >
+              <ChatInterface 
+                messages={messages} 
+                onSendMessage={handleSendMessage} 
+                isLoading={isProcessing} 
+                isConnected={isVoiceConnected}
+                transcripts={transcripts}
+              />
+           </TerminalDrawer>
+
            {/* Bottom Status Bar */}
            <StatusBar 
               panOffset={panOffset} 
               scale={scale} 
               activeContextId={activeContextId}
+              isVoiceConnected={isVoiceConnected}
            />
 
            {/* Command Palette */}
@@ -576,7 +697,6 @@ const App: React.FC = () => {
         ))}
 
     </HUDFrame>
-    </>
   );
 };
 

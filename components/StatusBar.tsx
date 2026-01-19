@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { Wifi, GitBranch, AlertCircle, CheckCircle2, Activity, Clock } from 'lucide-react';
+import { Wifi, GitBranch, Activity, Clock, Mic, Radio } from 'lucide-react';
 
 interface StatusBarProps {
   panOffset: { x: number; y: number };
   scale: number;
   activeContextId: string;
+  isVoiceConnected?: boolean;
 }
 
-const StatusBar: React.FC<StatusBarProps> = ({ panOffset, scale, activeContextId }) => {
+const StatusBar: React.FC<StatusBarProps> = ({ panOffset, scale, activeContextId, isVoiceConnected }) => {
   const [time, setTime] = useState(new Date());
   const [latency, setLatency] = useState(24);
 
@@ -26,7 +27,7 @@ const StatusBar: React.FC<StatusBarProps> = ({ panOffset, scale, activeContextId
   }, []);
 
   return (
-    <div className="absolute bottom-0 left-0 right-0 h-7 bg-[#09090b] border-t border-neutral-800 flex items-center justify-between px-3 z-50 select-none font-mono text-[10px] text-neutral-500 pointer-events-auto">
+    <div className="absolute bottom-0 left-0 right-0 h-7 bg-[#09090b]/90 backdrop-blur-md border-t border-neutral-800 flex items-center justify-between px-3 z-[60] select-none font-mono text-[10px] text-neutral-500 pointer-events-auto shadow-[0_-5px_20px_rgba(0,0,0,0.5)]">
       
       {/* LEFT: System Health */}
       <div className="flex items-center gap-4">
@@ -71,13 +72,26 @@ const StatusBar: React.FC<StatusBarProps> = ({ panOffset, scale, activeContextId
          </div>
       </div>
 
-      {/* RIGHT: Context & Time */}
+      {/* RIGHT: Context & Voice Status */}
       <div className="flex items-center gap-4">
         
-        <div className="flex items-center gap-1.5">
-            <Activity size={10} className="text-neutral-600" />
-            <span className="uppercase text-neutral-400">System: Nominal</span>
-        </div>
+        {/* Voice Status Indicator */}
+        {isVoiceConnected ? (
+           <div className="flex items-center gap-2 animate-pulse text-emerald-400 bg-emerald-950/30 px-2 py-0.5 rounded border border-emerald-900/50">
+               <Mic size={10} />
+               <span className="font-bold tracking-wider">VOICE ACTIVE</span>
+               <div className="flex gap-0.5 items-end h-2 ml-1">
+                   <div className="w-0.5 h-full bg-emerald-500 animate-[bounce_1s_infinite]"></div>
+                   <div className="w-0.5 h-2/3 bg-emerald-500 animate-[bounce_1.2s_infinite]"></div>
+                   <div className="w-0.5 h-full bg-emerald-500 animate-[bounce_0.8s_infinite]"></div>
+               </div>
+           </div>
+        ) : (
+           <div className="flex items-center gap-1.5">
+              <Activity size={10} className="text-neutral-600" />
+              <span className="uppercase text-neutral-400">System: Nominal</span>
+           </div>
+        )}
 
         <div className="h-3 w-px bg-neutral-800" />
 

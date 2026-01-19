@@ -29,20 +29,20 @@ const HUDFrame: React.FC<HUDFrameProps> = ({ children, hud, panOffset, scale, on
   }, [scale, onZoom]);
 
   return (
-    <div className="relative w-screen h-screen bg-black text-neutral-200 overflow-hidden font-sans selection:bg-white selection:text-black select-none">
+    <div className="fixed inset-0 bg-black text-neutral-200 overflow-hidden font-sans selection:bg-white selection:text-black select-none z-0">
       <Canvas panOffset={panOffset} onPan={onPan} scale={scale} />
       
       {/* World Content Layer - Scaled */}
       {/* origin-top-left ensures coordinate system remains logical (0,0 is top left) */}
       <div 
-        className="relative z-10 w-full h-full pointer-events-none origin-top-left transition-transform duration-75 ease-out will-change-transform"
+        className="absolute inset-0 z-10 w-full h-full pointer-events-none origin-top-left transition-transform duration-75 ease-out will-change-transform"
         style={{ transform: `scale(${scale})` }}
       >
         {children}
       </div>
 
       {/* Static HUD Layer - Fixed viewport coordinates */}
-      <div className="absolute inset-0 z-50 pointer-events-none">
+      <div className="absolute inset-0 z-50 pointer-events-none overflow-hidden">
         {hud}
       </div>
     </div>
