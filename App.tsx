@@ -21,7 +21,8 @@ import CommandPalette, { CommandOption } from './components/CommandPalette';
 import ContextBar, { ContextDef } from './components/ContextBar';
 import ContextDock from './components/ContextDock';
 import ContextManifest from './components/ContextManifest'; 
-import ContextZone from './components/ContextZone'; // Imported
+import ContextZone from './components/ContextZone';
+import SectorLocator from './components/SectorLocator';
 import { ScreenDraggable } from './components/ScreenDraggable';
 import { WindowState } from './types';
 import { useNexus } from './contexts/NexusContext';
@@ -108,13 +109,11 @@ const App: React.FC = () => {
 
   // -- Focus / Recenter Logic --
   const focusContext = useCallback((ctxId: string) => {
-      // 1. Identify targets
       let targetWindows = windows;
       if (ctxId !== 'global') {
           targetWindows = windows.filter(w => w.contextId === ctxId);
       }
 
-      // Default reset if no windows or global with no windows (unlikely)
       if (targetWindows.length === 0) {
           if (ctxId === 'global') {
               setIsTransitioning(true);
@@ -125,7 +124,6 @@ const App: React.FC = () => {
           return;
       }
 
-      // 2. Calculate Bounding Box
       let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
       targetWindows.forEach(w => {
           if (w.x < minX) minX = w.x;
@@ -134,33 +132,25 @@ const App: React.FC = () => {
           if (w.y + w.h > maxY) maxY = w.y + w.h;
       });
 
-      const padding = 150; // generous padding
+      const padding = 150; 
       const boundingW = (maxX - minX) + (padding * 2);
       const boundingH = (maxY - minY) + (padding * 2);
       const centerW = (maxX + minX) / 2;
       const centerH = (maxY + minY) / 2;
 
-      // 3. Calculate Fit Scale
-      // We want the bounding box to fit within the viewport
       const scaleX = viewport.width / boundingW;
       const scaleY = viewport.height / boundingH;
       
-      // Choose the smaller scale to ensure it fits, but clamp it to reasonable values
-      // If only 1 window, don't zoom in to 300%. If huge area, don't zoom out to 10%.
       let targetScale = Math.min(scaleX, scaleY);
       targetScale = Math.max(0.4, Math.min(targetScale, 1.1));
 
-      // 4. Calculate Pan Offset
-      // We want (centerW + panOffset.x) * Scale = ViewportWidth / 2
       const targetPanX = (viewport.width / 2 / targetScale) - centerW;
       const targetPanY = (viewport.height / 2 / targetScale) - centerH;
 
-      // 5. Apply
       setIsTransitioning(true);
       setScale(targetScale);
       setPanOffset({ x: targetPanX, y: targetPanY });
 
-      // Clear transition flag after animation completes
       setTimeout(() => setIsTransitioning(false), 750);
 
   }, [windows, viewport]);
@@ -201,20 +191,15 @@ const App: React.FC = () => {
   const handleContextSelect = useCallback((ctx: ContextDef) => {
       setActiveView('spatial');
       setActiveContextId(ctx.id);
-      
-      // Trigger the camera movement
       focusContext(ctx.id);
-      
   }, [setActiveContextId, setActiveView, focusContext]);
 
   const handleAutoLayout = useCallback(() => {
     resetLayout();
-    // After reset, focus global
     setTimeout(() => focusContext('global'), 10);
   }, [resetLayout, focusContext]);
 
   const handleFocusWindow = useCallback((id: string) => {
-      // 1. Visually select the window (triggers border highlight)
       setSelectedWindowId(id);
       
       if (id === 'terminal') {
@@ -222,40 +207,42 @@ const App: React.FC = () => {
           return;
       }
 
-      // Ensure we are in spatial mode to fly to coordinates
       if (activeView !== 'spatial') {
         setActiveView('spatial');
       }
       
-      // 2. Pan to the window
       const win = focusWindowInContext(id);
       if (win) {
           setIsTransitioning(true);
-
-          // Determine optimal scale to fit window with padding
-          // Add 40% padding around the window (1.4 factor)
           const fitPadding = 1.4;
           const scaleX = viewport.width / (win.w * fitPadding);
           const scaleY = viewport.height / (win.h * fitPadding);
           
-          // Use the smaller scale to ensure full visibility, clamped 0.5 - 1.2
           let targetScale = Math.min(scaleX, scaleY);
           targetScale = Math.max(0.5, Math.min(targetScale, 1.2));
 
-          // Center window on screen: PanX = (ViewportW / 2 / Scale) - WindowCenterX
           const winCenterX = win.x + (win.w / 2);
           const winCenterY = win.y + (win.h / 2);
 
           const targetPanX = (viewport.width / 2 / targetScale) - winCenterX;
           const targetPanY = (viewport.height / 2 / targetScale) - winCenterY;
 
-          // Apply state updates
           setScale(targetScale);
           setPanOffset({ x: targetPanX, y: targetPanY });
 
           setTimeout(() => setIsTransitioning(false), 750);
       }
   }, [focusWindowInContext, activeView, viewport, setActiveView]);
+
+  // -- Task Discussion Handler --
+  const handleDiscussTask = useCallback((taskId: string) => {
+    const task = tasks.find(t => t.id === taskId);
+    if (task) {
+        setIsTerminalOpen(true);
+        // Inject a conversational prompt about the task
+        sendMessage(`I'm working on the task "${task.title}". Can you give me a status update or suggest next steps?`, activeView.toUpperCase());
+    }
+  }, [tasks, sendMessage, activeView]);
 
   // -- Chat / Voice Integration --
   const handleToolCall = useCallback(async (name: string, args: any): Promise<any> => {
@@ -346,8 +333,6 @@ CURRENT HUD ENVIRONMENT:
   ];
 
   const isCompactMode = isTerminalOpen || isVoiceConnected;
-
-  // -- Empty State Logic --
   const activeContextWindows = windows.filter(w => w.contextId === activeContextId);
   const isContextEmpty = activeContextId !== 'global' && activeContextWindows.length === 0;
 
@@ -360,7 +345,6 @@ CURRENT HUD ENVIRONMENT:
         onZoom={handleZoom}
         isTransitioning={isTransitioning}
         activeContextId={activeContextId}
-        // -- HUD LAYER --
         hud={
           <>
             <ContextBar 
@@ -375,13 +359,25 @@ CURRENT HUD ENVIRONMENT:
                 activeThreads={activeThreads}
             />
             
-            {/* New Context Manifest / Overlay Log */}
             <ContextManifest 
                 activeContextId={activeContextId} 
                 windows={activeContextWindows}
+                tasks={tasks} 
                 contextLabel={contexts.find(c => c.id === activeContextId)?.label}
                 onItemClick={handleFocusWindow}
+                onDiscuss={handleDiscussTask} // Wired up
             />
+            
+            {/* Enhanced Sector Locator */}
+            {activeView === 'spatial' && !isContextEmpty && (
+              <SectorLocator 
+                windows={activeContextId === 'global' ? windows : activeContextWindows} 
+                viewport={viewport}
+                panOffset={panOffset}
+                scale={scale}
+                onLocate={() => focusContext(activeContextId)}
+              />
+            )}
 
             {!isCompactMode && (
               <ScreenDraggable initialLeft={32} initialBottom={32}>
@@ -475,7 +471,6 @@ CURRENT HUD ENVIRONMENT:
                 commands={commandList} 
             />
 
-            {/* Empty Context Initialization Overlay */}
             {isContextEmpty && (
                 <div className="fixed inset-0 flex items-center justify-center z-40 pointer-events-none">
                     <div className="bg-black/80 backdrop-blur-xl border border-neutral-800 p-8 rounded-2xl flex flex-col items-center gap-4 animate-in zoom-in-95 fade-in duration-500 pointer-events-auto shadow-[0_0_50px_rgba(0,0,0,0.8)]">
@@ -500,13 +495,7 @@ CURRENT HUD ENVIRONMENT:
           </>
         }
       >
-          {/* -- WORLD LAYER -- */}
-          
-          {/* 1. Context Zones (Floor Plan Markers) */}
           {activeView === 'spatial' && contexts.filter(c => c.id !== 'global').map(ctx => {
-              // Calculate zone bounding box based on default windows in that context
-              // This is a simplification; in a real app, calculate from actual content.
-              // For now, use the hardcoded grid dimensions for visual stability.
               let width = 1220; 
               let height = 800;
               if (ctx.id === 'dev') { width = 1220; height = 620; }
@@ -525,9 +514,7 @@ CURRENT HUD ENVIRONMENT:
               );
           })}
 
-          {/* 2. Windows */}
           {windows.map(win => {
-              // Calculate Layout Props from Context
               const renderProps = getSyntheticLayout(win, viewport, panOffset, scale);
               const activeThread = activeThreads.find(t => t.targetId === win.id && t.isActive);
 
@@ -543,7 +530,7 @@ CURRENT HUD ENVIRONMENT:
                       scale={scale}
                       isSelected={selectedWindowId === win.id}
                       isDimmed={renderProps.opacity < 1}
-                      isDragDisabled={activeView !== 'spatial'} // Lock in grid mode
+                      isDragDisabled={activeView !== 'spatial'}
                       aiThread={activeThread}
                       onMove={handleWindowMove}
                       onResize={handleWindowResize}
@@ -551,9 +538,9 @@ CURRENT HUD ENVIRONMENT:
                       onClose={closeWindow}
                       className={'bg-black border border-neutral-700 shadow-2xl flex flex-col'}
                   >
-                      <div className="h-6 bg-neutral-900 border-b border-neutral-800 flex items-center justify-between px-2 select-none shrink-0">
+                      <div className="h-6 bg-neutral-900 border-b border-neutral-800 flex items-center justify-center px-2 select-none shrink-0 relative">
                           <span className="text-[10px] font-bold tracking-widest text-neutral-500 uppercase">{win.title}</span>
-                          <div className="flex gap-1 group">
+                          <div className="absolute right-2 flex gap-1 group">
                               <div 
                                 onClick={(e) => { e.stopPropagation(); closeWindow(win.id); }}
                                 className="w-1.5 h-1.5 rounded-full bg-neutral-700 hover:bg-red-500 transition-colors cursor-pointer"
@@ -568,8 +555,6 @@ CURRENT HUD ENVIRONMENT:
               );
           })}
       </HUDFrame>
-      
-      {/* Global Overlay Slot */}
       <div id="global-overlays" className="fixed inset-0 pointer-events-none z-[100]"></div>
     </>
   );
