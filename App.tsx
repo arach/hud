@@ -24,6 +24,8 @@ import { Message, Task, WindowState } from './types';
 import { geminiService } from './services/geminiService';
 import { MOCK_TASKS, INITIAL_SYSTEM_INSTRUCTION, HUD_TOOLS } from './constants';
 import { useLiveSession } from './hooks/useLiveSession';
+import { usePersistentState } from './hooks/usePersistentState';
+import { useAuth } from './hooks/useAuth';
 import { 
   LayoutTemplate, 
   Terminal, 
@@ -93,44 +95,24 @@ const App: React.FC = () => {
   const [isTerminalOpen, setIsTerminalOpen] = useState(false);
   const [isTerminalMaximized, setIsTerminalMaximized] = useState(false);
 
-  const [hasApiKey, setHasApiKey] = useState(false);
-  const [isApiKeyModalOpen, setIsApiKeyModalOpen] = useState(false);
+  // -- Auth & Persistence Hooks --
+  const { hasApiKey, isApiKeyModalOpen, handleSaveKey, checkApiKey } = useAuth();
+  
+  const [messages, setMessages] = usePersistentState<Message[]>('NEXUS_MESSAGES', [
+    {
+      id: '1',
+      role: 'model',
+      content: 'Agent operational. Visual primitives loaded. Ready for development cycle.',
+      timestamp: Date.now()
+    }
+  ]);
+  
+  const [tasks, setTasks] = usePersistentState<Task[]>('NEXUS_TASKS', MOCK_TASKS);
 
   // -- Window Management --
   const [windows, setWindows] = useState<WindowState[]>(INITIAL_WINDOWS);
 
   // -- Content State --
-  const [messages, setMessages] = useState<Message[]>(() => {
-    const saved = localStorage.getItem('NEXUS_MESSAGES');
-    if (saved) {
-        try {
-            return JSON.parse(saved);
-        } catch (e) {
-            console.error("Failed to parse saved messages", e);
-        }
-    }
-    return [
-      {
-        id: '1',
-        role: 'model',
-        content: 'Agent operational. Visual primitives loaded. Ready for development cycle.',
-        timestamp: Date.now()
-      }
-    ];
-  });
-
-  const [tasks, setTasks] = useState<Task[]>(() => {
-    const saved = localStorage.getItem('NEXUS_TASKS');
-    if (saved) {
-        try {
-            return JSON.parse(saved);
-        } catch (e) {
-            console.error("Failed to parse saved tasks", e);
-        }
-    }
-    return MOCK_TASKS;
-  });
-
   const [isProcessing, setIsProcessing] = useState(false);
 
   // -- Helpers --
@@ -165,20 +147,6 @@ const App: React.FC = () => {
 
   // -- Effects --
   useEffect(() => {
-    // Check for API Key on mount
-    const storedKey = localStorage.getItem('GEMINI_API_KEY');
-    const envKey = process.env.API_KEY;
-    
-    if (storedKey || envKey) {
-        setHasApiKey(true);
-        // Ensure service is initialized if using stored key
-        if (storedKey && !geminiService.isConfigured()) {
-            geminiService.initialize(storedKey);
-        }
-    }
-  }, []);
-
-  useEffect(() => {
     if (!hasApiKey) return;
 
     geminiService.startChat(messages.slice(1).map(m => ({
@@ -186,14 +154,6 @@ const App: React.FC = () => {
         parts: [{ text: m.content }]
     })));
   }, [hasApiKey, messages]);
-
-  useEffect(() => {
-    localStorage.setItem('NEXUS_MESSAGES', JSON.stringify(messages));
-  }, [messages]);
-
-  useEffect(() => {
-    localStorage.setItem('NEXUS_TASKS', JSON.stringify(tasks));
-  }, [tasks]);
 
   useEffect(() => {
     const handleResize = () => {
@@ -361,21 +321,6 @@ const App: React.FC = () => {
           setActiveContextId('dev');
       }, 0);
   }, [viewport, scale]);
-
-  const handleSaveKey = (key: string) => {
-    localStorage.setItem('GEMINI_API_KEY', key);
-    geminiService.initialize(key);
-    setHasApiKey(true);
-    setIsApiKeyModalOpen(false);
-  };
-  
-  const checkApiKey = useCallback(() => {
-      if (!hasApiKey) {
-          setIsApiKeyModalOpen(true);
-          return false;
-      }
-      return true;
-  }, [hasApiKey]);
 
   const focusWindow = useCallback((id: string) => {
       // Special handling for terminal which is now a drawer
