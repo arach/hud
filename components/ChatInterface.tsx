@@ -15,6 +15,7 @@ interface ChatInterfaceProps {
   isLoading: boolean;
   isConnected: boolean;
   transcripts: Transcript[];
+  onRequireAuth?: () => boolean;
 }
 
 const ChatInterface: React.FC<ChatInterfaceProps> = ({ 
@@ -22,7 +23,8 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   onSendMessage, 
   isLoading, 
   isConnected,
-  transcripts
+  transcripts,
+  onRequireAuth
 }) => {
   const [input, setInput] = useState('');
   const [history, setHistory] = useState<string[]>([]);
