@@ -100,15 +100,37 @@ const App: React.FC = () => {
   const [windows, setWindows] = useState<WindowState[]>(INITIAL_WINDOWS);
 
   // -- Content State --
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: '1',
-      role: 'model',
-      content: 'Agent operational. Visual primitives loaded. Ready for development cycle.',
-      timestamp: Date.now()
+  const [messages, setMessages] = useState<Message[]>(() => {
+    const saved = localStorage.getItem('NEXUS_MESSAGES');
+    if (saved) {
+        try {
+            return JSON.parse(saved);
+        } catch (e) {
+            console.error("Failed to parse saved messages", e);
+        }
     }
-  ]);
-  const [tasks, setTasks] = useState<Task[]>(MOCK_TASKS);
+    return [
+      {
+        id: '1',
+        role: 'model',
+        content: 'Agent operational. Visual primitives loaded. Ready for development cycle.',
+        timestamp: Date.now()
+      }
+    ];
+  });
+
+  const [tasks, setTasks] = useState<Task[]>(() => {
+    const saved = localStorage.getItem('NEXUS_TASKS');
+    if (saved) {
+        try {
+            return JSON.parse(saved);
+        } catch (e) {
+            console.error("Failed to parse saved tasks", e);
+        }
+    }
+    return MOCK_TASKS;
+  });
+
   const [isProcessing, setIsProcessing] = useState(false);
 
   // -- Helpers --
@@ -164,6 +186,14 @@ const App: React.FC = () => {
         parts: [{ text: m.content }]
     })));
   }, [hasApiKey, messages]);
+
+  useEffect(() => {
+    localStorage.setItem('NEXUS_MESSAGES', JSON.stringify(messages));
+  }, [messages]);
+
+  useEffect(() => {
+    localStorage.setItem('NEXUS_TASKS', JSON.stringify(tasks));
+  }, [tasks]);
 
   useEffect(() => {
     const handleResize = () => {
