@@ -68,7 +68,8 @@ const App: React.FC = () => {
     updateWindow,
     selectWindow,
     focusWindow: focusWindowInContext,
-    resetLayout
+    resetLayout,
+    checkAuth
   } = useNexus();
 
   // -- Helpers (Layout Engine) --
@@ -287,6 +288,7 @@ CURRENT HUD ENVIRONMENT:
   });
 
   const toggleVoice = () => {
+      if (!checkAuth()) return;
       if (isVoiceConnected) disconnectVoice();
       else connectVoice();
   };
@@ -474,14 +476,14 @@ CURRENT HUD ENVIRONMENT:
                 <ChatInterface 
                   messages={messages} 
                   onSendMessage={handleTextSendMessage} 
-                  isLoading={isProcessing} 
-                  isConnected={isVoiceConnected}
-                  transcripts={transcripts}
-                  isActive={isTerminalOpen}
-                  activeScope={activeView.toUpperCase()}
-                />
-            </TerminalDrawer>
-
+                                  isLoading={isProcessing} 
+                                  isConnected={isVoiceConnected}
+                                  transcripts={transcripts}
+                                  isActive={isTerminalOpen}
+                                  activeScope={activeView.toUpperCase()}
+                                  onRequireAuth={checkAuth}
+                                />
+                             </TerminalDrawer>
             <StatusBar 
                 panOffset={panOffset} 
                 scale={scale} 

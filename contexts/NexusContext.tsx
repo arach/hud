@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import { Message, Task, WindowState, AiThread } from '../types';
 import { MOCK_TASKS, INITIAL_SYSTEM_INSTRUCTION } from '../constants';
 import { geminiService } from '../services/geminiService';
+import { useAuth } from './AuthContext';
 import { 
   Code2, 
   PenTool, 
@@ -78,11 +79,14 @@ interface NexusContextType {
   selectWindow: (id: string) => void;
   focusWindow: (id: string) => WindowState | undefined;
   resetLayout: () => void;
+  checkAuth: () => boolean;
 }
 
 const NexusContext = createContext<NexusContextType | undefined>(undefined);
 
 export const NexusProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { hasApiKey, checkAuth } = useAuth();
+
   // -- State: Persistence Enabled --
   const [tasks, setTasks] = useState<Task[]>(() => {
     const saved = localStorage.getItem('nexus_tasks');
@@ -118,13 +122,15 @@ export const NexusProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   // -- Gemini Initialization --
   useEffect(() => {
+    if (!hasApiKey) return;
+
     // Re-initialize chat with history on mount
     const history = messages.slice(1).map(m => ({
         role: m.role,
         parts: [{ text: m.content }]
     }));
     geminiService.startChat(history);
-  }, []); // Run once on mount
+  }, [hasApiKey]); // Run when API key becomes available
 
   // -- Actions --
 
@@ -153,6 +159,8 @@ export const NexusProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, []);
 
   const sendMessage = useCallback(async (text: string, scope?: string) => {
+    if (!checkAuth()) return;
+
     const userMsg: Message = {
       id: generateId(),
       role: 'user',
@@ -238,7 +246,8 @@ export const NexusProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       updateWindow,
       selectWindow,
       focusWindow,
-      resetLayout
+      resetLayout,
+      checkAuth
     }}>
       {children}
     </NexusContext.Provider>
