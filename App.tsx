@@ -29,7 +29,6 @@ import ContextZone from './components/ContextZone';
 import SectorLocator from './components/SectorLocator';
 import InspectorPanel from './components/InspectorPanel';
 import CommandDock from './components/CommandDock';
-import ZoomControls from './components/ZoomControls';
 import { useHud } from './contexts/HudContext';
 import { INITIAL_SYSTEM_INSTRUCTION, HUD_TOOLS } from './constants';
 import { useLiveSession } from './hooks/useLiveSession';
@@ -718,15 +717,11 @@ CURRENT HUD ENVIRONMENT:
                   </div>
             </div>
 
-            {/* Zoom Controls - Map style, bottom right */}
-            <ZoomControls
-              scale={scale}
-              onZoomIn={() => setScale(s => Math.min(3, s + 0.2))}
-              onZoomOut={() => setScale(s => Math.max(0.2, s - 0.2))}
-            />
-
             {!isCompactMode && (
               <CommandDock
+                  scale={scale}
+                  onZoomIn={() => setScale(s => Math.min(3, s + 0.2))}
+                  onZoomOut={() => setScale(s => Math.max(0.2, s - 0.2))}
                   onOpenCommandPalette={() => setIsCmdPaletteOpen(true)}
                   onToggleVoice={toggleVoice}
                   onToggleTerminal={() => setIsTerminalOpen(p => !p)}
