@@ -59,7 +59,7 @@ const StatusBar: React.FC<StatusBarProps> = ({
   };
 
   const handleCopyViewport = async () => {
-    const payload = `CAM X:${viewportCamera.x.toFixed(0)} Y:${viewportCamera.y.toFixed(0)} | SIZE ${viewportSize.w.toFixed(0)}x${viewportSize.h.toFixed(0)}`;
+    const payload = `PAN: ${viewportCamera.x.toFixed(0)},${viewportCamera.y.toFixed(0)} | SIZE: ${viewportSize.w.toFixed(0)}x${viewportSize.h.toFixed(0)} | ZOOM: ${(scale * 100).toFixed(0)}%`;
     try {
       await navigator.clipboard.writeText(payload);
       setVpCopied(true);
@@ -115,30 +115,30 @@ const StatusBar: React.FC<StatusBarProps> = ({
       </div>
 
       {/* CENTER: Viewport Data (Hidden on mobile or when controls need space) */}
-      <div className={`absolute left-1/2 -translate-x-1/2 flex items-center gap-4 hidden md:flex opacity-70 hover:opacity-100 transition-opacity ${isCompact ? 'opacity-30' : ''}`}>
-         <div className="flex items-center gap-1">
-             <span className="text-neutral-600">CX:</span>
-             <span className="tabular-nums w-8 text-right">{viewportCamera.x.toFixed(0)}</span>
-         </div>
-         <div className="flex items-center gap-1">
-             <span className="text-neutral-600">CY:</span>
-             <span className="tabular-nums w-8 text-right">{viewportCamera.y.toFixed(0)}</span>
-         </div>
-         <div className="h-3 w-px bg-neutral-800" />
-         <div className="flex items-center gap-1">
-             <span className="text-neutral-600">ZM:</span>
-             <span className="tabular-nums">{(scale * 100).toFixed(0)}%</span>
-         </div>
-         <div className="h-3 w-px bg-neutral-800" />
+      <div className={`absolute left-1/2 -translate-x-1/2 flex items-center gap-3 hidden md:flex opacity-70 hover:opacity-100 transition-opacity ${isCompact ? 'opacity-30' : ''}`}>
          <button
              onClick={handleCopyViewport}
-             className="flex items-center gap-2 hover:text-neutral-200 transition-colors cursor-pointer"
-             title="Copy camera and viewport size"
+             className="flex items-center gap-3 hover:text-neutral-200 transition-colors cursor-pointer"
+             title="Copy viewport data"
          >
-             <span className="text-neutral-600">VP:</span>
-             <span className={`tabular-nums ${vpCopied ? 'text-emerald-500' : ''}`}>
-               CAM X:{viewportCamera.x.toFixed(0)} Y:{viewportCamera.y.toFixed(0)} | SIZE {viewportSize.w.toFixed(0)}x{viewportSize.h.toFixed(0)}
-             </span>
+             <div className="flex items-center gap-1">
+                 <span className="text-neutral-600">PAN:</span>
+                 <span className={`tabular-nums ${vpCopied ? 'text-emerald-500' : ''}`}>
+                   {viewportCamera.x.toFixed(0)},{viewportCamera.y.toFixed(0)}
+                 </span>
+             </div>
+             <div className="h-3 w-px bg-neutral-800" />
+             <div className="flex items-center gap-1">
+                 <span className="text-neutral-600">SIZE:</span>
+                 <span className={`tabular-nums ${vpCopied ? 'text-emerald-500' : ''}`}>
+                   {viewportSize.w.toFixed(0)}x{viewportSize.h.toFixed(0)}
+                 </span>
+             </div>
+             <div className="h-3 w-px bg-neutral-800" />
+             <div className="flex items-center gap-1">
+                 <span className="text-neutral-600">ZOOM:</span>
+                 <span className={`tabular-nums ${vpCopied ? 'text-emerald-500' : ''}`}>{(scale * 100).toFixed(0)}%</span>
+             </div>
          </button>
       </div>
 

@@ -135,7 +135,7 @@ const DraggableWindow: React.FC<DraggableWindowProps> = ({
       }}
       className={`
         flex flex-col animate-in zoom-in-95 duration-300
-        ${isDragging ? 'cursor-grabbing' : isDragDisabled ? 'cursor-default' : 'cursor-grab'} 
+        ${isDragging ? 'cursor-grabbing' : 'cursor-default'}
         ${className}
       `}
       onMouseDown={handleContentMouseDown} 

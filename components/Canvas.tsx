@@ -259,12 +259,8 @@ const Canvas: React.FC<CanvasProps> = ({ panOffset, scale, onPan, onPanStart, on
   const bgPosX = (panOffset.x * scale) % majorGridSize;
   const bgPosY = (panOffset.y * scale) % majorGridSize;
 
-  // Determine cursor class for canvas
-  const canvasCursor = isPanning
-    ? 'cursor-grabbing'
-    : isSpaceDownRef.current
-      ? 'cursor-grab'
-      : 'cursor-grab';
+  // Determine cursor class for canvas - grab (hand) on grid, grabbing when panning
+  const canvasCursor = isPanning ? 'cursor-grabbing' : 'cursor-grab';
 
   return (
     <div
