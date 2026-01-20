@@ -103,8 +103,8 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
         
         {/* Welcome Message */}
         <div className="text-neutral-500 select-none pb-4 border-b border-neutral-800/50 mb-4">
-            <p>Nexus OS [Version 2.0.4]</p>
-            <p className="opacity-50">(c) 2026 Nexus Corp. All rights reserved.</p>
+            <p>HUD OS [Version 2.0.4]</p>
+            <p className="opacity-50">(c) 2026 HUD Systems. All rights reserved.</p>
             <p className="text-emerald-500/80 mt-2 flex items-center gap-2">
                 <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
                 System initialized. Uplink established.

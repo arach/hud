@@ -31,7 +31,7 @@ const completeTaskTool: FunctionDeclaration = {
 const tools: Tool[] = [{ functionDeclarations: [createTaskTool, completeTaskTool] }];
 
 // --- Client Class ---
-export class NexusClient {
+export class HudClient {
   private ai: GoogleGenAI | null = null;
   private chatSession: any;
   private apiKey: string | null = null;
@@ -66,7 +66,7 @@ export class NexusClient {
         history: history,
       });
     } catch (error) {
-      console.error("NexusClient: Failed to start chat session", error);
+      console.error("HudClient: Failed to start chat session", error);
     }
   }
 
@@ -111,10 +111,10 @@ export class NexusClient {
       }
       return result.text || "Command processed.";
     } catch (error) {
-      console.error("NexusClient: Error sending message", error);
+      console.error("HudClient: Error sending message", error);
       return "Error: Uplink unstable.";
     }
   }
 }
 
-export const nexusClient = new NexusClient();
+export const hudClient = new HudClient();

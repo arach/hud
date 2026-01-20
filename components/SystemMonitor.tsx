@@ -12,7 +12,7 @@ const SystemMonitor: React.FC = () => {
   const [cpuVal, setCpuVal] = useState(45);
   const [memVal, setMemVal] = useState(32);
   const [processes, setProcesses] = useState([
-    { name: 'nexus_core', cpu: 12, mem: 250, status: 'active' },
+    { name: 'hud_core', cpu: 12, mem: 250, status: 'active' },
     { name: 'gemini_link', cpu: 8, mem: 120, status: 'active' },
     { name: 'ui_renderer', cpu: 25, mem: 400, status: 'warning' },
     { name: 'db_worker', cpu: 2, mem: 80, status: 'idle' },

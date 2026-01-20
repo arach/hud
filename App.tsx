@@ -26,7 +26,7 @@ import ContextZone from './components/ContextZone';
 import SectorLocator from './components/SectorLocator';
 import { ScreenDraggable } from './components/ScreenDraggable';
 import InspectorPanel from './components/InspectorPanel';
-import { useNexus } from './contexts/NexusContext';
+import { useHud } from './contexts/HudContext';
 import { INITIAL_SYSTEM_INSTRUCTION, HUD_TOOLS } from './constants';
 import { useLiveSession } from './hooks/useLiveSession';
 import { matchesNamespace, DEFAULT_NAMESPACE_QUERY } from './lib/namespace';
@@ -75,7 +75,7 @@ const App: React.FC = () => {
   // Transition State
   const [isTransitioning, setIsTransitioning] = useState(false);
 
-  // -- Consume Nexus Context --
+  // -- Consume HUD Context --
   const {
     tasks,
     messages,
@@ -100,7 +100,7 @@ const App: React.FC = () => {
     resetLayout,
     checkAuth,
     getSyntheticLayout
-  } = useNexus();
+  } = useHud();
 
   // -- Effects --
   useEffect(() => {

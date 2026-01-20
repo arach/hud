@@ -85,7 +85,7 @@ const generateId = () => Math.random().toString(36).substring(2, 9);
 
 // --- CONTEXT DEFINITION ---
 
-interface NexusContextType {
+interface HudContextType {
   // Data State
   messages: Message[];
   tasks: Task[];
@@ -121,19 +121,19 @@ interface NexusContextType {
   getSyntheticLayout: (win: WindowState, viewport: {width: number, height: number}, panOffset: {x: number, y: number}, scale: number) => { x: number, y: number, w: number, h: number, opacity: number, pointerEvents: 'auto' | 'none' };
 }
 
-const NexusContext = createContext<NexusContextType | undefined>(undefined);
+const HudContext = createContext<HudContextType | undefined>(undefined);
 
-export const NexusProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const HudProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { hasApiKey, checkAuth } = useAuth();
 
   // -- State: Persistence Enabled --
   const [tasks, setTasks] = useState<Task[]>(() => {
-    const saved = localStorage.getItem('nexus_tasks');
+    const saved = localStorage.getItem('hud_tasks');
     return saved ? JSON.parse(saved) : MOCK_TASKS;
   });
 
   const [messages, setMessages] = useState<Message[]>(() => {
-    const saved = localStorage.getItem('nexus_messages');
+    const saved = localStorage.getItem('hud_messages');
     if (saved) return JSON.parse(saved);
     return [{
       id: '1',
@@ -153,11 +153,11 @@ export const NexusProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   // -- Persistence Effects --
   useEffect(() => {
-    localStorage.setItem('nexus_tasks', JSON.stringify(tasks));
+    localStorage.setItem('hud_tasks', JSON.stringify(tasks));
   }, [tasks]);
 
   useEffect(() => {
-    localStorage.setItem('nexus_messages', JSON.stringify(messages));
+    localStorage.setItem('hud_messages', JSON.stringify(messages));
   }, [messages]);
 
   // -- Gemini Initialization --
@@ -387,7 +387,7 @@ export const NexusProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, [activeView, windows, namespaceQuery]);
 
   return (
-    <NexusContext.Provider value={{
+    <HudContext.Provider value={{
       messages,
       tasks,
       windows,
@@ -413,14 +413,14 @@ export const NexusProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       getSyntheticLayout
     }}>
       {children}
-    </NexusContext.Provider>
+    </HudContext.Provider>
   );
 };
 
-export const useNexus = () => {
-  const context = useContext(NexusContext);
+export const useHud = () => {
+  const context = useContext(HudContext);
   if (!context) {
-    throw new Error('useNexus must be used within a NexusProvider');
+    throw new Error('useHud must be used within a HudProvider');
   }
   return context;
 };

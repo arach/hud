@@ -1,7 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
-import { NexusProvider } from './contexts/NexusContext';
+import { HudProvider } from './contexts/HudContext';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import ApiKeyModal from './components/ApiKeyModal';
 
@@ -20,10 +20,10 @@ const root = ReactDOM.createRoot(rootElement);
 root.render(
   <React.StrictMode>
     <AuthProvider>
-        <NexusProvider>
+        <HudProvider>
             <App />
             <SystemOverlay />
-        </NexusProvider>
+        </HudProvider>
     </AuthProvider>
   </React.StrictMode>
 );

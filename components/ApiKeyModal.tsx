@@ -43,7 +43,7 @@ const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ onSave, isOpen }) => {
         <div className="p-6">
             <p className="text-neutral-300 text-sm mb-4 leading-relaxed">
                 <strong className="text-white">Authentication Required.</strong><br/>
-                Please provide a valid Gemini API Key to establish a secure uplink with the Nexus Core.
+                Please provide a valid Gemini API Key to establish a secure uplink with the HUD Core.
             </p>
 
             <form onSubmit={handleSubmit} className="space-y-4">

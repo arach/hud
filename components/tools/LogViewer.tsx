@@ -54,7 +54,7 @@ const LogViewer: React.FC = () => {
         </div>
         
         <div className="h-5 bg-[#080808] border-t border-neutral-800 flex items-center px-2 justify-between text-neutral-500">
-            <span>/var/log/nexus_agent.log</span>
+            <span>/var/log/hud_agent.log</span>
             <span>{logs.length} lines</span>
         </div>
     </div>
