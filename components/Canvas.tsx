@@ -265,27 +265,30 @@ const Canvas: React.FC<CanvasProps> = ({ panOffset, scale, onPan, onPanStart, on
   return (
     <div
         ref={containerRef}
-        className={`absolute inset-0 z-0 overflow-hidden bg-[#050505] ${canvasCursor}`}
+        className={`absolute inset-0 z-0 overflow-hidden bg-black ${canvasCursor}`}
         onMouseDown={handleMouseDown}
     >
       {/* Subtle dot pattern - gives sense of navigable space */}
+      {/* Extended beyond viewport to prevent edge artifacts at various zoom levels */}
       <div
-        className="absolute inset-0 opacity-[0.4] pointer-events-none"
+        className="absolute opacity-[0.4] pointer-events-none"
         style={{
+            inset: '-100px',
             backgroundImage: `radial-gradient(circle, #333 1px, transparent 1px)`,
             backgroundSize: `${minorGridSize}px ${minorGridSize}px`,
-            backgroundPosition: `${bgPosX}px ${bgPosY}px`,
+            backgroundPosition: `${bgPosX + 100}px ${bgPosY + 100}px`,
             backgroundRepeat: 'repeat'
         }}
       />
 
       {/* Larger dot pattern for depth */}
       <div
-        className="absolute inset-0 opacity-[0.15] pointer-events-none"
+        className="absolute opacity-[0.15] pointer-events-none"
         style={{
+            inset: '-100px',
             backgroundImage: `radial-gradient(circle, #444 1.5px, transparent 1.5px)`,
             backgroundSize: `${majorGridSize}px ${majorGridSize}px`,
-            backgroundPosition: `${bgPosX}px ${bgPosY}px`,
+            backgroundPosition: `${bgPosX + 100}px ${bgPosY + 100}px`,
             backgroundRepeat: 'repeat'
         }}
       />
