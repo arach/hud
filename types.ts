@@ -33,6 +33,8 @@ export type WindowType = 'editor' | 'terminal' | 'visual' | 'system';
 export interface WindowState {
   id: string;
   contextId?: string;
+  namespace: string;
+  tags?: string[];
   type: WindowType; // Added for Tiling
   x: number;
   y: number;

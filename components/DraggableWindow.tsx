@@ -13,10 +13,12 @@ interface DraggableWindowProps {
   zIndex: number;
   isSelected: boolean;
   isDimmed?: boolean;
-  aiThread?: { topic: string; messageCount: number }; // New Prop for AI Bubble
+  isDragDisabled?: boolean; 
+  aiThread?: { topic: string; messageCount: number };
   onMove: (id: string, x: number, y: number) => void;
   onResize: (id: string, w: number, h: number) => void;
   onSelect: (id: string) => void;
+  onClose?: (id: string) => void; // New Prop
   children: React.ReactNode;
   className?: string;
 }
@@ -32,10 +34,12 @@ const DraggableWindow: React.FC<DraggableWindowProps> = ({
   zIndex, 
   isSelected,
   isDimmed = false,
+  isDragDisabled = false,
   aiThread,
   onMove, 
   onResize,
   onSelect,
+  onClose,
   children, 
   className = '' 
 }) => {
@@ -77,13 +81,15 @@ const DraggableWindow: React.FC<DraggableWindowProps> = ({
   }, [isDragging, isResizing, dragStart, initialPos, initialSize, id, onMove, onResize, w, h, scale]);
 
   const handleMouseDown = (e: React.MouseEvent) => {
-    // Only start drag if left click
+    // Only start drag if left click and dragging is enabled
     if (e.button !== 0) return;
     
     e.stopPropagation();
     e.preventDefault(); // Prevent text selection start
     onSelect(id);
     
+    if (isDragDisabled) return; // Stop here if locked
+
     setIsDragging(true);
     setDragStart({ x: e.clientX, y: e.clientY });
     setInitialPos({ x, y });
@@ -93,6 +99,9 @@ const DraggableWindow: React.FC<DraggableWindowProps> = ({
     e.stopPropagation();
     e.preventDefault();
     onSelect(id);
+    
+    if (isDragDisabled) return; // Stop resize in grid mode too
+
     setIsResizing(true);
     setDragStart({ x: e.clientX, y: e.clientY });
     setInitialSize({ w: w || 0, h: h || 0 });
@@ -121,24 +130,25 @@ const DraggableWindow: React.FC<DraggableWindowProps> = ({
         // Visual styling for dimmed state
         opacity: isDimmed ? 0.3 : 1,
         filter: isDimmed ? 'grayscale(100%) blur(1px)' : 'none',
-        transition: 'all 0.4s cubic-bezier(0.16, 1, 0.3, 1)', // Smoother transition for grid/spatial switching
+        transition: 'all 0.5s cubic-bezier(0.2, 0.8, 0.2, 1)', // Smooth transition for layout changes
         pointerEvents: isDimmed ? 'none' : 'auto' 
       }}
       className={`
-        flex flex-col
-        ${isDragging ? 'cursor-grabbing' : ''} 
+        flex flex-col animate-in zoom-in-95 duration-300
+        ${isDragging ? 'cursor-grabbing' : isDragDisabled ? 'cursor-default' : 'cursor-grab'} 
         ${className}
       `}
       onMouseDown={handleContentMouseDown} 
     >
       {/* Selection Border / Glow */}
       <div className={`absolute -inset-[3px] pointer-events-none transition-opacity duration-300 ${isSelected && !isDimmed ? 'opacity-100' : 'opacity-0'}`}>
-         <div className="absolute inset-0 border border-emerald-500/40 shadow-[0_0_30px_rgba(16,185,129,0.2)] animate-pulse rounded-sm"></div>
-         {/* Tech Corners */}
-         <div className="absolute top-0 left-0 w-3 h-3 border-t-2 border-l-2 border-emerald-400"></div>
-         <div className="absolute top-0 right-0 w-3 h-3 border-t-2 border-r-2 border-emerald-400"></div>
-         <div className="absolute bottom-0 left-0 w-3 h-3 border-b-2 border-l-2 border-emerald-400"></div>
-         <div className="absolute bottom-0 right-0 w-3 h-3 border-b-2 border-r-2 border-emerald-400"></div>
+         <div className={`absolute inset-0 border shadow-[0_0_30px_rgba(16,185,129,0.2)] animate-pulse rounded-sm ${isDragDisabled ? 'border-blue-500/40' : 'border-emerald-500/40'}`}></div>
+         
+         {/* Tech Corners - Change color based on mode */}
+         <div className={`absolute top-0 left-0 w-3 h-3 border-t-2 border-l-2 ${isDragDisabled ? 'border-blue-400' : 'border-emerald-400'}`}></div>
+         <div className={`absolute top-0 right-0 w-3 h-3 border-t-2 border-r-2 ${isDragDisabled ? 'border-blue-400' : 'border-emerald-400'}`}></div>
+         <div className={`absolute bottom-0 left-0 w-3 h-3 border-b-2 border-l-2 ${isDragDisabled ? 'border-blue-400' : 'border-emerald-400'}`}></div>
+         <div className={`absolute bottom-0 right-0 w-3 h-3 border-b-2 border-r-2 ${isDragDisabled ? 'border-blue-400' : 'border-emerald-400'}`}></div>
       </div>
 
       {/* AI Activity Badge (Floating above window) */}
@@ -161,15 +171,15 @@ const DraggableWindow: React.FC<DraggableWindowProps> = ({
 
       {/* DRAG HANDLE */}
       <div 
-          className="absolute top-0 left-0 right-0 h-6 z-50 cursor-grab active:cursor-grabbing"
+          className={`absolute top-0 left-0 right-0 h-6 z-50 ${isDragDisabled ? 'cursor-default' : 'cursor-grab active:cursor-grabbing'}`}
           onMouseDown={handleMouseDown}
-          title="Drag to move"
+          title={isDragDisabled ? "Position Locked (Grid View)" : "Drag to move"}
       ></div>
 
       {children}
 
       {/* Resize Handle */}
-      {!isDimmed && (
+      {!isDimmed && !isDragDisabled && (
           <div 
             className="absolute bottom-0 right-0 w-6 h-6 cursor-nwse-resize group flex items-end justify-end p-1 pointer-events-auto z-50"
             onMouseDown={handleResizeMouseDown}
