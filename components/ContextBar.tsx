@@ -18,9 +18,11 @@ interface ContextBarProps {
   onNamespaceQueryChange: (value: string) => void;
   logsOpen?: boolean;
   onToggleLogs?: () => void;
+  /** When true, strips fixed positioning for use inside NavigationStack */
+  embedded?: boolean;
 }
 
-const ContextBar: React.FC<ContextBarProps> = ({ contexts, activeContextId, onSelect, namespaceQuery, onNamespaceQueryChange, logsOpen = false, onToggleLogs }) => {
+const ContextBar: React.FC<ContextBarProps> = ({ contexts, activeContextId, onSelect, namespaceQuery, onNamespaceQueryChange, logsOpen = false, onToggleLogs, embedded = false }) => {
   const [draftQuery, setDraftQuery] = useState(namespaceQuery);
   const draftQueryRef = useRef(namespaceQuery);
 
@@ -55,18 +57,28 @@ const ContextBar: React.FC<ContextBarProps> = ({ contexts, activeContextId, onSe
   // Separate Global from specific scopes
   const specificContexts = contexts.filter(c => c.id !== 'global');
 
+  // Positioning classes: fixed when standalone, relative when embedded
+  const positionClasses = embedded
+    ? 'relative w-full'
+    : 'fixed top-4 left-4 right-4 z-50 pointer-events-auto';
+
+  // Container classes: with backdrop when standalone, transparent when embedded
+  const containerClasses = embedded
+    ? 'py-3 px-4'
+    : 'bg-black/85 backdrop-blur-xl border border-neutral-800/80 rounded-xl shadow-chrome py-3 px-4';
+
   return (
-    <div data-hud-panel="context-bar" className="fixed top-4 left-4 right-4 z-50 pointer-events-auto">
-      <div className="grid grid-cols-[auto_1fr_auto] items-center gap-4 w-full">
+    <div data-hud-panel="context-bar" className={positionClasses}>
+      <div className={`grid grid-cols-[auto_1fr_auto] items-center gap-4 w-full ${containerClasses}`}>
         {/* Logs Anchor */}
         <div className="flex items-center">
           <button
             onClick={onToggleLogs}
             className={`
-              flex items-center gap-2 px-4 py-2 rounded-full text-[11px] font-bold tracking-wide transition-all duration-300 shadow-xl border backdrop-blur-md shrink-0 whitespace-nowrap
-              ${logsOpen 
-                  ? 'bg-emerald-950/80 text-emerald-300 border-emerald-500/40 shadow-[0_0_20px_rgba(16,185,129,0.25)]' 
-                  : 'bg-black/40 text-neutral-400 border-neutral-800 hover:bg-black/60 hover:text-white'}
+              flex items-center gap-2 px-4 py-1.5 rounded-full text-[11px] font-bold tracking-wide transition-all duration-300 shrink-0 whitespace-nowrap
+              ${logsOpen
+                  ? 'bg-emerald-950/80 text-emerald-300 border border-emerald-500/40 shadow-[0_0_15px_rgba(16,185,129,0.2)]'
+                  : 'bg-white/5 text-neutral-400 border border-neutral-700/50 hover:bg-white/10 hover:text-white'}
             `}
             title="Toggle log stream"
           >
@@ -77,7 +89,7 @@ const ContextBar: React.FC<ContextBarProps> = ({ contexts, activeContextId, onSe
 
         {/* Specific Scopes Pill */}
         <div className="flex justify-center">
-          <div className="flex flex-nowrap bg-neutral-900/60 backdrop-blur-xl border border-white/10 rounded-full p-1 shadow-2xl gap-1 transition-colors duration-300 hover:bg-neutral-900/80">
+          <div className="flex flex-nowrap bg-white/5 border border-neutral-700/50 rounded-full p-1 gap-1 transition-colors duration-300 hover:bg-white/10">
             {specificContexts.map((ctx) => {
               const isActive = activeContextId === ctx.id;
               return (
@@ -108,8 +120,8 @@ const ContextBar: React.FC<ContextBarProps> = ({ contexts, activeContextId, onSe
         </div>
 
         {/* Namespace Query */}
-        <div className="flex items-center justify-end">
-          <div className="flex items-center gap-2 bg-black/60 backdrop-blur-md border border-neutral-800 rounded-full px-3 py-1.5 shadow-xl">
+        <div className="flex items-center justify-end pr-8">
+          <div className="flex items-center gap-2 bg-white/5 border border-neutral-700/50 rounded-full px-3 py-1.5">
             <span className="text-[9px] font-bold tracking-widest text-neutral-500">SCOPE</span>
             <input
               value={draftQuery}

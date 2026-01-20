@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { WindowState } from '../types';
+import { PANEL_STYLES } from '../lib/hudChrome';
+import { Minimize2, Maximize2, Map } from 'lucide-react';
 
 interface MinimapProps {
   windows: WindowState[];
@@ -9,9 +11,15 @@ interface MinimapProps {
   onNavigate: (x: number, y: number) => void;
   width?: number;
   height?: number;
+  /** When true, uses fixed positioning with chrome styles */
+  fixedPosition?: boolean;
+  /** When true, minimap is collapsed into status bar */
+  isCollapsed?: boolean;
+  /** Callback to toggle collapsed state */
+  onToggleCollapse?: () => void;
 }
 
-const Minimap: React.FC<MinimapProps> = ({ windows, viewport, panOffset, appScale, onNavigate, width, height }) => {
+const Minimap: React.FC<MinimapProps> = ({ windows, viewport, panOffset, appScale, onNavigate, width, height, fixedPosition = false, isCollapsed = false, onToggleCollapse }) => {
   // Dynamic map dimensions with fallback
   const mapW = width || 250;
   const mapH = height || 180;
@@ -140,8 +148,37 @@ const Minimap: React.FC<MinimapProps> = ({ windows, viewport, panOffset, appScal
     document.body.style.cursor = 'grabbing';
   };
 
+  // If collapsed, don't render the full minimap
+  if (isCollapsed && fixedPosition) {
+    return null; // Collapsed state is handled in StatusBar
+  }
+
+  // Container classes: fixed positioned with chrome styles, or inline
+  const containerClasses = fixedPosition
+    ? `${PANEL_STYLES.minimap} flex flex-col pointer-events-auto`
+    : 'bg-black flex flex-col overflow-hidden pointer-events-auto';
+
   return (
-    <div className="w-full h-full bg-black border border-neutral-800 flex flex-col overflow-hidden pointer-events-auto">
+    <div
+      className={containerClasses}
+      style={{ width: mapW, height: mapH }}
+    >
+      {/* Header with collapse toggle */}
+      {fixedPosition && (
+        <div className="h-6 border-b border-neutral-800 bg-neutral-900/50 flex items-center justify-between px-2 text-[9px] text-neutral-500 font-mono select-none shrink-0">
+          <div className="flex items-center gap-1.5">
+            <Map size={10} className="text-neutral-600" />
+            <span className="tracking-wider">MINIMAP</span>
+          </div>
+          <button
+            onClick={onToggleCollapse}
+            className="p-0.5 hover:bg-white/10 rounded transition-colors text-neutral-500 hover:text-white"
+            title="Collapse minimap"
+          >
+            <Minimize2 size={10} />
+          </button>
+        </div>
+      )}
       {/* Map Area */}
       <div 
         className="flex-1 relative bg-neutral-950 overflow-hidden cursor-crosshair group"

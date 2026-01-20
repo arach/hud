@@ -19,33 +19,29 @@ import DiffViewer from './components/tools/DiffViewer';
 import LogViewer from './components/tools/LogViewer';
 import SystemMonitor from './components/SystemMonitor';
 import CommandPalette, { CommandOption } from './components/CommandPalette';
-import ContextBar, { ContextDef } from './components/ContextBar';
-import ContextDock, { ViewMode } from './components/ContextDock';
-import ContextManifest from './components/ContextManifest'; 
+import { ContextDef } from './components/ContextBar';
+import { ViewMode } from './components/ContextDock';
+import NavigationStack from './components/NavigationStack';
+import ContextManifest from './components/ContextManifest';
 import ContextZone from './components/ContextZone';
 import SectorLocator from './components/SectorLocator';
-import { ScreenDraggable } from './components/ScreenDraggable';
 import InspectorPanel from './components/InspectorPanel';
+import CommandDock from './components/CommandDock';
 import { useHud } from './contexts/HudContext';
 import { INITIAL_SYSTEM_INSTRUCTION, HUD_TOOLS } from './constants';
 import { useLiveSession } from './hooks/useLiveSession';
 import { matchesNamespace, DEFAULT_NAMESPACE_QUERY } from './lib/namespace';
 import { logPanEvent, HUD_PAN_EVENT, HudLogEntry } from './lib/hudLogger';
-import { 
-  LayoutTemplate, 
-  Terminal, 
-  Code, 
-  Database, 
+import {
+  Terminal,
+  Code,
+  Database,
   Workflow,
-  ZoomIn,
-  ZoomOut,
-  Search,
-  ChevronUp,
-  Mic,
-  MicOff,
   Globe,
   LayoutGrid,
-  Power
+  Power,
+  Mic,
+  PanelLeft
 } from 'lucide-react';
 
 const App: React.FC = () => {
@@ -57,6 +53,8 @@ const App: React.FC = () => {
   const [isTerminalOpen, setIsTerminalOpen] = useState(false);
   const [isTerminalMaximized, setIsTerminalMaximized] = useState(false);
   const [isLogDockOpen, setIsLogDockOpen] = useState(false);
+  const [isMinimapCollapsed, setIsMinimapCollapsed] = useState(false);
+  const [isManifestCollapsed, setIsManifestCollapsed] = useState(false);
   const [selectedWindowId, setSelectedWindowId] = useState<string | null>(null);
   const [selectedContextId, setSelectedContextId] = useState<string | null>(null);
   const [selectedFilter, setSelectedFilter] = useState<{ kind: 'view'; id: ViewMode } | null>(null);
@@ -609,51 +607,56 @@ CURRENT HUD ENVIRONMENT:
         onViewportChange={handleViewportChange}
         hud={
           <>
-            <ContextBar 
-                contexts={contexts} 
-                activeContextId={activeContextId} 
-                onSelect={handleContextSelect}
+            <NavigationStack
+                contexts={contexts}
+                activeContextId={activeContextId}
+                onContextSelect={handleContextSelect}
+                onResetToGlobal={handleAutoLayout}
                 namespaceQuery={namespaceQuery}
                 onNamespaceQueryChange={setNamespaceQuery}
-                logsOpen={isLogDockOpen}
-                onToggleLogs={() => setIsLogDockOpen(prev => !prev)}
             />
-
-            <ScreenDraggable
-                initialRight={24}
-                initialTop={112}
-                storageKey="hud:context-dock:top"
-                className="z-[70]"
-            >
-              <ContextDock 
+            
+            {!isManifestCollapsed && (
+              <ContextManifest
+                  activeContextId={activeContextId}
+                  windows={scopedWindows}
+                  tasks={tasks}
+                  contextLabel={contexts.find(c => c.id === activeContextId)?.label || 'CUSTOM'}
+                  onItemClick={handleFocusWindow}
+                  onDiscuss={handleDiscussTask}
+                  namespaceQuery={namespaceQuery}
                   activeView={activeView}
                   onSelectView={handleViewSelect}
                   activeThreads={activeThreads}
-                  isFixed={false}
-                  orientation="horizontal"
+                  contexts={contexts}
+                  contextSizes={contextSizes}
+                  selectedWindowId={selectedWindowId}
+                  selectedContextId={selectedContextId}
+                  selectedFilter={selectedFilter}
+                  hudLogs={hudLogs}
+                  canvasDebug={canvasDebug}
+                  panOffset={panOffset}
+                  scale={scale}
+                  forceDebug={false}
+                  logsExpanded={isLogDockOpen}
+                  onToggleLogs={() => setIsLogDockOpen(prev => !prev)}
+                  isCollapsed={isManifestCollapsed}
+                  onToggleCollapse={() => setIsManifestCollapsed(prev => !prev)}
+                  viewport={viewport}
+                  onNavigate={handleNavigate}
               />
-            </ScreenDraggable>
-            
-            <ContextManifest 
-                activeContextId={activeContextId} 
-                windows={scopedWindows}
-                tasks={tasks} 
-                contextLabel={contexts.find(c => c.id === activeContextId)?.label || 'CUSTOM'}
-                onItemClick={handleFocusWindow}
-                onDiscuss={handleDiscussTask} // Wired up
-                namespaceQuery={namespaceQuery}
-                activeView={activeView}
-                contexts={contexts}
-                contextSizes={contextSizes}
-                selectedWindowId={selectedWindowId}
-                selectedContextId={selectedContextId}
-                selectedFilter={selectedFilter}
-                hudLogs={hudLogs}
-                canvasDebug={canvasDebug}
-                panOffset={panOffset}
-                scale={scale}
-                forceDebug={isLogDockOpen}
-            />
+            )}
+
+            {/* Collapsed Manifest Toggle */}
+            {isManifestCollapsed && (
+              <button
+                onClick={() => setIsManifestCollapsed(false)}
+                className="fixed top-[56px] left-2 z-40 p-2 bg-black/90 backdrop-blur-xl border border-neutral-800 rounded-lg hover:bg-white/10 transition-colors pointer-events-auto"
+                title="Expand sidebar"
+              >
+                <PanelLeft size={16} className="text-neutral-400" />
+              </button>
+            )}
 
             <InspectorPanel
                 windows={windows}
@@ -681,21 +684,6 @@ CURRENT HUD ENVIRONMENT:
               />
             )}
 
-            {!isCompactMode && (
-              <ScreenDraggable initialLeft={32} initialBottom={32}>
-                <div className="w-[200px] h-[150px] border border-neutral-800 bg-black">
-                    <Minimap 
-                        windows={scopedWindows} 
-                        viewport={{ ...viewport, x: -panOffset.x, y: -panOffset.y }} 
-                        panOffset={panOffset} 
-                        appScale={scale} 
-                        onNavigate={handleNavigate} 
-                        width={200} 
-                        height={150} 
-                    />
-                </div>
-              </ScreenDraggable>
-            )}
 
             <div className={`fixed right-8 pointer-events-none z-50 transition-all duration-300 ease-in-out flex flex-col items-end ${isTerminalOpen ? 'bottom-[340px]' : 'bottom-24'}`}>
                   <div className="pointer-events-auto">
@@ -704,44 +692,17 @@ CURRENT HUD ENVIRONMENT:
             </div>
 
             {!isCompactMode && (
-              <div className="fixed right-8 bottom-8 flex flex-col items-end pointer-events-none z-50 transition-all duration-300 ease-in-out">
-                  <div className="pointer-events-auto flex items-center gap-2">
-                      <div className="flex bg-black/80 backdrop-blur-sm border border-neutral-800 rounded overflow-hidden shadow-xl items-center h-8">
-                          <button 
-                            onClick={() => setIsCmdPaletteOpen(true)}
-                            className="flex items-center gap-2 px-3 h-full hover:bg-neutral-800 text-neutral-400 hover:text-white transition-colors border-r border-neutral-800"
-                          >
-                            <Search size={14} />
-                            <span className="text-[10px] font-mono font-bold hidden sm:inline">CMD+K</span>
-                          </button>
-                          <button 
-                            onClick={toggleVoice}
-                            className={`w-10 h-full flex items-center justify-center transition-colors border-r border-neutral-800 ${
-                                isVoiceConnected ? 'bg-emerald-900/30 text-emerald-500 animate-pulse' : 'hover:bg-neutral-800 text-neutral-400 hover:text-white'
-                            }`}
-                          >
-                            {isVoiceConnected ? <Mic size={14} /> : <MicOff size={14} />}
-                          </button>
-                          <button 
-                            onClick={() => setIsTerminalOpen(p => !p)}
-                            className={`w-10 h-full flex items-center justify-center transition-colors border-r border-neutral-800 ${
-                                isTerminalOpen ? 'bg-neutral-800 text-white' : 'hover:bg-neutral-800 text-neutral-400 hover:text-white'
-                            }`}
-                          >
-                            {isTerminalOpen ? <ChevronUp size={14} className="rotate-180" /> : <Terminal size={14} />}
-                          </button>
-                          <button onClick={() => setScale(s => Math.max(0.2, s - 0.2))} className="w-8 h-full flex items-center justify-center hover:bg-neutral-800 text-neutral-400 hover:text-white transition-colors border-r border-neutral-800"><ZoomOut size={14} /></button>
-                          <button
-                            onClick={handleAutoLayout}
-                            className="px-2 h-full flex items-center justify-center text-[10px] font-mono font-bold text-neutral-400 hover:text-white hover:bg-neutral-800 transition-colors border-r border-neutral-800"
-                            title="Recenter & reset layout"
-                          >
-                            {Math.round(scale * 100)}%
-                          </button>
-                          <button onClick={() => setScale(s => Math.min(3, s + 0.2))} className="w-8 h-full flex items-center justify-center hover:bg-neutral-800 text-neutral-400 hover:text-white transition-colors"><ZoomIn size={14} /></button>
-                      </div>
-                  </div>
-              </div>
+              <CommandDock
+                  scale={scale}
+                  onZoomIn={() => setScale(s => Math.min(3, s + 0.2))}
+                  onZoomOut={() => setScale(s => Math.max(0.2, s - 0.2))}
+                  onResetLayout={handleAutoLayout}
+                  onOpenCommandPalette={() => setIsCmdPaletteOpen(true)}
+                  onToggleVoice={toggleVoice}
+                  onToggleTerminal={() => setIsTerminalOpen(p => !p)}
+                  isVoiceConnected={isVoiceConnected}
+                  isTerminalOpen={isTerminalOpen}
+              />
             )}
 
             <TerminalDrawer 
@@ -763,9 +724,9 @@ CURRENT HUD ENVIRONMENT:
                                   onRequireAuth={checkAuth}
                                 />
                              </TerminalDrawer>
-            <StatusBar 
-                panOffset={panOffset} 
-                scale={scale} 
+            <StatusBar
+                panOffset={panOffset}
+                scale={scale}
                 viewport={viewport}
                 activeContextId={activeContextId}
                 isVoiceConnected={isVoiceConnected}
@@ -773,6 +734,8 @@ CURRENT HUD ENVIRONMENT:
                 onToggleTerminal={() => setIsTerminalOpen(p => !p)}
                 onToggleVoice={toggleVoice}
                 isTerminalOpen={isTerminalOpen}
+                isMinimapCollapsed={isMinimapCollapsed}
+                onToggleMinimap={() => setIsMinimapCollapsed(prev => !prev)}
             />
 
             <CommandPalette 

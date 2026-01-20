@@ -3,6 +3,7 @@ import { WindowState } from '../types';
 import { ContextDef } from './ContextBar';
 import type { CanvasDebugState } from './Canvas';
 import { Check, Copy } from 'lucide-react';
+import { PANEL_STYLES } from '../lib/hudChrome';
 
 interface InspectorPanelProps {
   windows: WindowState[];
@@ -34,6 +35,7 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({
   scale
 }) => {
   const [copied, setCopied] = useState(false);
+
   const selectedWindow = useMemo(() => {
     if (!selectedWindowId) return null;
     return windows.find(win => win.id === selectedWindowId) || null;
@@ -130,24 +132,34 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({
   };
 
   return (
-    <div data-hud-panel="inspector" className="fixed top-6 right-4 z-40 pointer-events-none select-none font-mono text-[10px]">
-      <div className="w-[280px] pointer-events-auto backdrop-blur-md border border-neutral-800 bg-black/80 rounded-lg shadow-2xl p-4">
-        <div className="flex items-center justify-between mb-3 pb-2 border-b border-white/10 text-neutral-400">
-          <span className="tracking-widest font-bold">INSPECTOR</span>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={handleCopyInspector}
-              className="flex items-center gap-1 text-[9px] text-neutral-500 hover:text-white transition-colors"
-              title="Copy inspector snapshot"
-            >
-              {copied ? <Check size={10} className="text-emerald-500" /> : <Copy size={10} />}
-              {copied ? 'COPIED' : 'COPY'}
-            </button>
-            <span className="text-[9px] text-neutral-600">META</span>
+    <div
+      data-hud-panel="inspector"
+      className={`${PANEL_STYLES.inspector} pointer-events-none select-none font-mono text-[10px] flex flex-col`}
+    >
+      {/* Top highlight line */}
+      <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent z-10" />
+
+      <div className="pointer-events-auto flex-1 flex flex-col overflow-hidden">
+        {/* Header - Fixed */}
+        <div className="shrink-0 p-4 border-b border-neutral-800/50">
+          <div className="flex items-center justify-between text-neutral-400">
+            <span className="tracking-widest font-bold">INSPECTOR</span>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleCopyInspector}
+                className="flex items-center gap-1 text-[9px] text-neutral-500 hover:text-white transition-colors"
+                title="Copy inspector snapshot"
+              >
+                {copied ? <Check size={10} className="text-emerald-500" /> : <Copy size={10} />}
+                {copied ? 'COPIED' : 'COPY'}
+              </button>
+              <span className="text-[9px] text-neutral-600">META</span>
+            </div>
           </div>
         </div>
 
-        <div className="space-y-4">
+        {/* Scrollable Content */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-4">
           <div>
             <div className="flex items-center gap-2 text-[9px] uppercase text-neutral-500 mb-1">
               <span className="inline-flex h-1.5 w-1.5 rounded-full bg-amber-500/80"></span>

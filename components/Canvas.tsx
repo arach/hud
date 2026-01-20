@@ -259,10 +259,17 @@ const Canvas: React.FC<CanvasProps> = ({ panOffset, scale, onPan, onPanStart, on
   const bgPosX = (panOffset.x * scale) % majorGridSize;
   const bgPosY = (panOffset.y * scale) % majorGridSize;
 
+  // Determine cursor class for canvas
+  const canvasCursor = isPanning
+    ? 'cursor-grabbing'
+    : isSpaceDownRef.current
+      ? 'cursor-grab'
+      : 'cursor-grab';
+
   return (
-    <div 
+    <div
         ref={containerRef}
-        className="absolute inset-0 z-0 overflow-hidden bg-[#050505] cursor-grab active:cursor-grabbing"
+        className={`absolute inset-0 z-0 overflow-hidden bg-[#050505] ${canvasCursor}`}
         onMouseDown={handleMouseDown}
     >
       {/* Blueprint Grid - Major */}

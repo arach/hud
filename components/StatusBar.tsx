@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Wifi, GitBranch, Activity, Clock, Mic, Terminal, Radio } from 'lucide-react';
+import { Wifi, GitBranch, Activity, Clock, Mic, Terminal, Radio, Map, Maximize2 } from 'lucide-react';
+import { PANEL_STYLES } from '../lib/hudChrome';
 
 interface StatusBarProps {
   panOffset: { x: number; y: number };
@@ -12,18 +13,23 @@ interface StatusBarProps {
   onToggleTerminal?: () => void;
   onToggleVoice?: () => void;
   isTerminalOpen?: boolean;
+  // Minimap integration
+  isMinimapCollapsed?: boolean;
+  onToggleMinimap?: () => void;
 }
 
-const StatusBar: React.FC<StatusBarProps> = ({ 
-  panOffset, 
-  scale, 
+const StatusBar: React.FC<StatusBarProps> = ({
+  panOffset,
+  scale,
   viewport,
-  activeContextId, 
+  activeContextId,
   isVoiceConnected,
   isCompact,
   onToggleTerminal,
   onToggleVoice,
-  isTerminalOpen
+  isTerminalOpen,
+  isMinimapCollapsed = false,
+  onToggleMinimap
 }) => {
   const [time, setTime] = useState(new Date());
   const [latency, setLatency] = useState(24);
@@ -64,10 +70,26 @@ const StatusBar: React.FC<StatusBarProps> = ({
   };
 
   return (
-    <div data-hud-panel="status-bar" className="fixed bottom-0 left-0 right-0 h-7 bg-[#09090b]/90 backdrop-blur-md border-t border-neutral-800 flex items-center justify-between px-3 z-[60] select-none font-mono text-[10px] text-neutral-500 pointer-events-auto shadow-[0_-5px_20px_rgba(0,0,0,0.5)]">
+    <div data-hud-panel="status-bar" className={`${PANEL_STYLES.statusBar} h-7 flex items-center justify-between px-3 select-none font-mono text-[10px] text-neutral-500 pointer-events-auto`}>
       
-      {/* LEFT: System Health */}
+      {/* LEFT: System Health + Collapsed Minimap */}
       <div className="flex items-center gap-4">
+        {/* Collapsed Minimap Indicator */}
+        {isMinimapCollapsed && (
+          <>
+            <button
+              onClick={onToggleMinimap}
+              className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-white/5 border border-neutral-800 hover:bg-white/10 transition-colors text-neutral-400 hover:text-white"
+              title="Expand minimap"
+            >
+              <Map size={10} />
+              <span className="text-[9px] font-bold">MAP</span>
+              <Maximize2 size={8} className="opacity-60" />
+            </button>
+            <div className="h-3 w-px bg-neutral-800" />
+          </>
+        )}
+
         <div className="flex items-center gap-2 text-emerald-500">
             <div className="relative flex h-2 w-2">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
