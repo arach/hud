@@ -1,6 +1,15 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { WindowState, Task } from '../types';
 import { Check, Activity, Circle, Terminal, MousePointer2, Database, Copy, ClipboardCheck, MessageSquare, Sparkles } from 'lucide-react';
+import type { CanvasDebugState } from './Canvas';
+
+interface HudLogEntry {
+  id: string;
+  label: string;
+  tag: string;
+  timestamp: string;
+  payload: Record<string, unknown>;
+}
 
 interface ContextManifestProps {
   activeContextId: string;
@@ -9,6 +18,18 @@ interface ContextManifestProps {
   contextLabel?: string;
   onItemClick?: (id: string) => void;
   onDiscuss?: (taskId: string) => void; // New prop for conversational interaction
+  namespaceQuery: string;
+  activeView: string;
+  contexts: { id: string; label: string; color: string; x: number; y: number }[];
+  contextSizes: Record<string, { width: number; height: number }>;
+  selectedWindowId: string | null;
+  selectedContextId: string | null;
+  selectedFilter: { kind: 'view'; id: string } | null;
+  hudLogs?: HudLogEntry[];
+  canvasDebug?: CanvasDebugState | null;
+  panOffset?: { x: number; y: number };
+  scale?: number;
+  forceDebug?: boolean;
 }
 
 interface LogItem {
@@ -45,12 +66,33 @@ const SYSTEM_LOGS: Record<string, string[]> = {
   ]
 };
 
-const ContextManifest: React.FC<ContextManifestProps> = ({ activeContextId, windows, tasks = [], contextLabel, onItemClick, onDiscuss }) => {
+const ContextManifest: React.FC<ContextManifestProps> = ({
+  activeContextId,
+  windows,
+  tasks = [],
+  contextLabel,
+  onItemClick,
+  onDiscuss,
+  namespaceQuery,
+  activeView,
+  contexts,
+  contextSizes,
+  selectedWindowId,
+  selectedContextId,
+  selectedFilter,
+  hudLogs = [],
+  canvasDebug,
+  panOffset,
+  scale,
+  forceDebug = false
+}) => {
   const [logs, setLogs] = useState<LogItem[]>([]);
   const [headerText, setHeaderText] = useState('');
   const [showDebug, setShowDebug] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [globalCopySuccess, setGlobalCopySuccess] = useState(false);
+  const [stateCopySuccess, setStateCopySuccess] = useState(false);
+  const [canvasCopySuccess, setCanvasCopySuccess] = useState(false);
   
   const logsRef = useRef(logs);
   const windowsRef = useRef(windows);
@@ -62,7 +104,7 @@ const ContextManifest: React.FC<ContextManifestProps> = ({ activeContextId, wind
   tasksRef.current = tasks;
   activeContextIdRef.current = activeContextId;
 
-  const handleGlobalCopy = async () => {
+  const handleSystemCopy = async () => {
     const currentLogs = logsRef.current;
     const currentWindows = windowsRef.current;
     
@@ -70,6 +112,11 @@ const ContextManifest: React.FC<ContextManifestProps> = ({ activeContextId, wind
         timestamp: new Date().toISOString(),
         context: activeContextIdRef.current,
         system_status: 'ONLINE',
+        canvas_snapshot: canvasDebug ? {
+            panOffset,
+            scale,
+            canvas: canvasDebug
+        } : null,
         manifest_snapshot: currentLogs.map(l => {
              let data;
              if (l.type === 'window') data = currentWindows.find(w => w.id === l.id);
@@ -94,13 +141,98 @@ const ContextManifest: React.FC<ContextManifestProps> = ({ activeContextId, wind
     }
   };
 
+  const handleStateCopy = async () => {
+    const selectedWindow = selectedWindowId ? windows.find(win => win.id === selectedWindowId) || null : null;
+    const selectedContext = selectedContextId ? contexts.find(ctx => ctx.id === selectedContextId) || null : null;
+    const selectionType = selectedWindow ? 'window' : selectedContext ? 'context' : selectedFilter ? 'filter' : 'none';
+    const viewLabels: Record<string, string> = {
+      spatial: 'Spatial Map',
+      terminals: 'Terminal Grid',
+      editors: 'Code Grid',
+      visuals: 'Visual Grid'
+    };
+    const snapshot = {
+      timestamp: new Date().toISOString(),
+      system: {
+        namespaceQuery,
+        activeView,
+        activeContextId,
+        panOffset,
+        scale
+      },
+      canvas: canvasDebug
+        ? {
+            state: canvasState,
+            ...canvasDebug
+          }
+        : null,
+      selection: {
+        type: selectionType,
+        window: selectedWindow
+          ? {
+              id: selectedWindow.id,
+              title: selectedWindow.title,
+              namespace: selectedWindow.namespace,
+              contextId: selectedWindow.contextId,
+              type: selectedWindow.type,
+              tags: selectedWindow.tags,
+              zIndex: selectedWindow.zIndex,
+              position: { x: selectedWindow.x, y: selectedWindow.y },
+              size: { w: selectedWindow.w, h: selectedWindow.h }
+            }
+          : null,
+        context: selectedContext
+          ? {
+              id: selectedContext.id,
+              label: selectedContext.label,
+              color: selectedContext.color,
+              origin: { x: selectedContext.x, y: selectedContext.y },
+              size: contextSizes[selectedContext.id] || null
+            }
+          : null,
+        filter: selectedFilter
+          ? {
+              kind: selectedFilter.kind,
+              id: selectedFilter.id,
+              label: viewLabels[selectedFilter.id] || selectedFilter.id
+            }
+          : null
+      }
+    };
+
+    try {
+      await navigator.clipboard.writeText(JSON.stringify(snapshot, null, 2));
+      setStateCopySuccess(true);
+      setTimeout(() => setStateCopySuccess(false), 1500);
+    } catch (err) {
+      console.error('State copy failed', err);
+    }
+  };
+
+  const handleCanvasCopy = async () => {
+    if (!canvasDebug) return;
+    const payload = {
+      timestamp: new Date().toISOString(),
+      panOffset,
+      scale,
+      canvas: canvasDebug
+    };
+    try {
+      await navigator.clipboard.writeText(JSON.stringify(payload, null, 2));
+      setCanvasCopySuccess(true);
+      setTimeout(() => setCanvasCopySuccess(false), 1500);
+    } catch (err) {
+      console.error('Canvas copy failed', err);
+    }
+  };
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
         const isMod = e.metaKey || e.ctrlKey;
         if (isMod) setShowDebug(true);
         if (e.shiftKey && (isMod || e.altKey) && e.code === 'KeyC') {
              e.preventDefault();
-             handleGlobalCopy();
+             handleSystemCopy();
         }
     };
 
@@ -193,10 +325,57 @@ const ContextManifest: React.FC<ContextManifestProps> = ({ activeContextId, wind
     setTimeout(() => setCopiedId(null), 2000);
   };
 
+  const handleCopyHudLogs = () => {
+    const payload = hudLogs.slice(-50).map(entry => ({
+      ...entry,
+      formatted: formatHudLog(entry)
+    }));
+    navigator.clipboard.writeText(JSON.stringify(payload, null, 2));
+    setCopiedId('hud-log');
+    setTimeout(() => setCopiedId(null), 2000);
+  };
+
+  const formatHudLog = (entry: HudLogEntry) => {
+    const payload = entry.payload || {};
+    const timestamp = new Date(entry.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    const source = typeof payload.source === 'string' ? payload.source : undefined;
+    const delta = payload.delta as { x?: number; y?: number } | undefined;
+    const targetPan = payload.targetPan as { x?: number; y?: number } | undefined;
+    const next = payload.next as { x?: number; y?: number } | undefined;
+    const canvas = payload.canvas as CanvasDebugState | undefined;
+
+    let detail = '';
+    if (delta && typeof delta.x === 'number' && typeof delta.y === 'number') {
+      detail = ` dx:${delta.x.toFixed(1)} dy:${delta.y.toFixed(1)}`;
+    } else if (targetPan && typeof targetPan.x === 'number' && typeof targetPan.y === 'number') {
+      detail = ` tx:${targetPan.x.toFixed(0)} ty:${targetPan.y.toFixed(0)}`;
+    } else if (next && typeof next.x === 'number' && typeof next.y === 'number') {
+      detail = ` x:${next.x.toFixed(0)} y:${next.y.toFixed(0)}`;
+    }
+
+    let canvasDetail = '';
+    if (canvas) {
+      const state = canvas.isPanLocked ? 'LOCK' : canvas.isPanning ? 'PAN' : canvas.pendingPan ? 'PEND' : 'IDLE';
+      canvasDetail = ` c:${state} b:${canvas.buttons}`;
+    }
+
+    return `${timestamp} ${entry.tag} ${entry.label}${source ? ` ${source}` : ''}${detail}${canvasDetail}`;
+  };
+
+  const canvasState = (() => {
+    if (!canvasDebug) return 'IDLE';
+    if (canvasDebug.isPanLocked) return 'LOCKED';
+    if (canvasDebug.isPanning) return 'PANNING';
+    if (canvasDebug.pendingPan) return 'PENDING';
+    return 'IDLE';
+  })();
+
   if (activeContextId === 'global') return null;
 
+  const isExpanded = showDebug || forceDebug;
+
   return (
-    <div className={`fixed top-24 left-8 z-40 pointer-events-none select-none font-mono text-[10px] transition-all duration-300 ease-out ${showDebug ? 'w-[400px]' : 'w-64'}`}>
+    <div data-hud-panel="manifest" className={`fixed top-4 left-4 z-40 pointer-events-none select-none font-mono text-[10px] transition-all duration-300 ease-out ${isExpanded ? 'w-[400px]' : 'w-64'}`}>
       <div className={`pointer-events-auto backdrop-blur-md border p-4 rounded-lg shadow-2xl animate-in fade-in slide-in-from-left-4 duration-500 transition-colors ${globalCopySuccess ? 'bg-emerald-950/80 border-emerald-500/50' : 'bg-black/80 border-neutral-800'}`}>
         
         <div className="flex items-center justify-between mb-4 pb-2 border-b border-white/10 text-neutral-400">
@@ -208,6 +387,14 @@ const ContextManifest: React.FC<ContextManifestProps> = ({ activeContextId, wind
             </div>
             {showDebug && !globalCopySuccess && (
                 <div className="flex items-center gap-2">
+                    <button
+                        onClick={handleStateCopy}
+                        className="flex items-center gap-1 text-[8px] text-neutral-500 hover:text-white transition-colors"
+                        title="Copy canvas/state snapshot"
+                    >
+                        {stateCopySuccess ? <Check size={10} className="text-emerald-500" /> : <Copy size={10} />}
+                        {stateCopySuccess ? 'COPIED' : 'COPY'}
+                    </button>
                     <span className="text-[8px] text-neutral-500">SHIFT+CMD+C</span>
                     <span className="text-[9px] text-emerald-500 bg-emerald-950/50 px-1.5 py-0.5 rounded border border-emerald-900/50">DEBUG</span>
                 </div>
@@ -255,21 +442,21 @@ const ContextManifest: React.FC<ContextManifestProps> = ({ activeContextId, wind
                                 {log.text}
                             </span>
                             
-                            {log.status === 'done' && log.type === 'window' && !showDebug && (
+                            {log.status === 'done' && log.type === 'window' && !isExpanded && (
                                 <div className="opacity-0 group-hover:opacity-100 transition-opacity">
                                     <MousePointer2 size={10} className="text-emerald-500" />
                                 </div>
                             )}
-                            {log.status === 'done' && log.type === 'task' && !showDebug && (
+                            {log.status === 'done' && log.type === 'task' && !isExpanded && (
                                 <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
                                     <span className="text-[8px] uppercase">Discuss</span>
                                     <Sparkles size={10} className="text-amber-400" />
                                 </div>
                             )}
-                             {showDebug && log.status === 'done' && <Database size={10} className="text-neutral-600" />}
+                             {isExpanded && log.status === 'done' && <Database size={10} className="text-neutral-600" />}
                         </div>
 
-                        {showDebug && log.status !== 'pending' && (
+                        {isExpanded && log.status !== 'pending' && (
                             <div className="pl-6 pr-1 py-1 animate-in slide-in-from-top-1 fade-in duration-200">
                                 <div className="bg-[#0b0b0b] border border-neutral-800/80 rounded p-2 shadow-inner overflow-hidden relative group/code">
                                     <div className="absolute top-1 right-1 flex items-center gap-1 opacity-0 group-hover/code:opacity-100 transition-opacity z-10">
@@ -294,6 +481,62 @@ const ContextManifest: React.FC<ContextManifestProps> = ({ activeContextId, wind
                 );
             })}
         </div>
+
+        {hudLogs.length > 0 && (
+          <div className="mt-4 pt-3 border-t border-neutral-800">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[8px] uppercase tracking-widest text-neutral-500">HUD PAN LOG</span>
+              <button
+                onClick={handleCopyHudLogs}
+                className="flex items-center gap-1 text-[8px] text-neutral-500 hover:text-white transition-colors"
+                title="Copy HUD pan logs"
+              >
+                {copiedId === 'hud-log' ? <Check size={10} className="text-emerald-500" /> : <Copy size={10} />}
+                {copiedId === 'hud-log' ? 'COPIED' : 'COPY'}
+              </button>
+            </div>
+            <div className="max-h-24 overflow-y-auto flex flex-col gap-1 text-[9px] text-neutral-500">
+              {hudLogs.slice(-12).map(entry => (
+                <div key={entry.id} className="font-mono text-[9px] text-neutral-500">
+                  {formatHudLog(entry)}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {canvasDebug && (
+          <div className="mt-4 pt-3 border-t border-neutral-800">
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-[8px] uppercase tracking-widest text-neutral-500">CANVAS</div>
+              <button
+                onClick={handleCanvasCopy}
+                className="flex items-center gap-1 text-[8px] text-neutral-500 hover:text-white transition-colors"
+                title="Copy canvas snapshot"
+              >
+                {canvasCopySuccess ? <Check size={10} className="text-emerald-500" /> : <Copy size={10} />}
+                {canvasCopySuccess ? 'COPIED' : 'COPY'}
+              </button>
+            </div>
+            <div className="flex flex-col gap-1 text-[9px] text-neutral-500 font-mono">
+              <div>STATE: {canvasState}</div>
+              {typeof panOffset?.x === 'number' && typeof panOffset?.y === 'number' && (
+                <div>PAN: {panOffset.x.toFixed(1)},{panOffset.y.toFixed(1)}</div>
+              )}
+              {typeof scale === 'number' && (
+                <div>SCALE: {scale.toFixed(2)}</div>
+              )}
+              <div>BUTTONS: {canvasDebug.buttons}</div>
+              <div>SPACE: {canvasDebug.isSpaceDown ? 'DOWN' : 'UP'}</div>
+              <div>MOUSE: {canvasDebug.mouse.x.toFixed(0)},{canvasDebug.mouse.y.toFixed(0)}</div>
+              {canvasDebug.pendingStart && (
+                <div>PENDING: {canvasDebug.pendingStart.x.toFixed(0)},{canvasDebug.pendingStart.y.toFixed(0)}</div>
+              )}
+              <div>LAST PAN: {canvasDebug.lastPan.x.toFixed(0)},{canvasDebug.lastPan.y.toFixed(0)}</div>
+              <div>TS: {new Date(canvasDebug.timestamp).toLocaleTimeString()}</div>
+            </div>
+          </div>
+        )}
         
          <div className="mt-4 pt-2 border-t border-neutral-800 flex justify-between text-[8px] text-neutral-600">
              <span>ALLOC.MEM: OK</span>

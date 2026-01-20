@@ -95,7 +95,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
 
   return (
     <div 
-        className="flex flex-col h-full font-mono text-xs md:text-sm cursor-text bg-transparent"
+        className="flex flex-col h-full font-mono text-[11px] md:text-[12px] font-normal cursor-text bg-transparent"
         onClick={handleContainerClick}
     >
       {/* Output Area */}
@@ -118,7 +118,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
               // User Command Block
               <div className="flex items-start gap-3 bg-white/5 border border-white/10 rounded-r-lg rounded-bl-lg p-3 max-w-[90%] md:max-w-[70%] mb-2">
                 <span className="text-emerald-400 font-bold select-none mt-0.5">$</span>
-                <span className="text-white whitespace-pre-wrap font-medium">{msg.content}</span>
+                <span className="text-white whitespace-pre-wrap font-normal">{msg.content}</span>
               </div>
             ) : (
               // System Response Block
@@ -144,7 +144,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                  {t.role === 'user' ? 'AUDIO_IN' : 'AUDIO_OUT'} 
                  {!t.isFinal && <span className="animate-pulse">_</span>}
             </div>
-            <div className={`text-sm italic ${t.role === 'user' ? 'text-white/70' : 'text-emerald-400/70'}`}>
+            <div className={`text-[11px] md:text-[12px] italic ${t.role === 'user' ? 'text-white/70' : 'text-emerald-400/70'}`}>
                  "{t.text}"
             </div>
           </div>
@@ -168,7 +168,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
 
           <div className="text-emerald-500 font-bold select-none shrink-0 pl-1">
              {isConnected ? (
-                 <span className="animate-pulse flex items-center gap-2 text-xs uppercase tracking-widest"><Mic size={12} /> Voice Active</span>
+                 <span className="animate-pulse flex items-center gap-2 text-[10px] uppercase tracking-widest"><Mic size={12} /> Voice Active</span>
              ) : (
                  <ChevronRight size={16} />
              )}

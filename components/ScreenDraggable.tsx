@@ -8,41 +8,67 @@ interface ScreenDraggableProps {
   initialRight?: number;
   className?: string;
   children: React.ReactNode;
+  storageKey?: string;
 }
 
 export const ScreenDraggable: React.FC<ScreenDraggableProps> = ({ 
   initialLeft, initialBottom, initialTop, initialRight,
-  className = '', 
+  className = '',
+  storageKey,
   children 
 }) => {
   const [position, setPosition] = useState<{x: number, y: number} | null>(null);
+  const positionRef = useRef<{x: number, y: number} | null>(null);
   const ref = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const dragStartRef = useRef({ x: 0, y: 0 });
   const startPosRef = useRef({ x: 0, y: 0 });
 
   useEffect(() => {
+    if (!storageKey) return;
+    try {
+      const raw = localStorage.getItem(storageKey);
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      if (typeof parsed?.x === 'number' && typeof parsed?.y === 'number') {
+        setPosition({ x: parsed.x, y: parsed.y });
+        positionRef.current = { x: parsed.x, y: parsed.y };
+      }
+    } catch (error) {
+      console.warn('Failed to read draggable position', error);
+    }
+  }, [storageKey]);
+
+  useEffect(() => {
     // Initialize position on mount so we can drag from a known state
     if (!position && ref.current) {
         const rect = ref.current.getBoundingClientRect();
         setPosition({ x: rect.left, y: rect.top });
+        positionRef.current = { x: rect.left, y: rect.top };
     }
-  }, []);
+  }, [position]);
 
   useEffect(() => {
       const handleMouseMove = (e: MouseEvent) => {
           if (!isDragging) return;
           const deltaX = e.clientX - dragStartRef.current.x;
           const deltaY = e.clientY - dragStartRef.current.y;
-          
-          setPosition({
+          const next = {
               x: startPosRef.current.x + deltaX,
               y: startPosRef.current.y + deltaY
-          });
+          };
+          positionRef.current = next;
+          setPosition(next);
       };
 
       const handleMouseUp = () => {
           setIsDragging(false);
+          if (!storageKey || !positionRef.current) return;
+          try {
+            localStorage.setItem(storageKey, JSON.stringify(positionRef.current));
+          } catch (error) {
+            console.warn('Failed to persist draggable position', error);
+          }
       };
 
       if (isDragging) {
@@ -63,8 +89,10 @@ export const ScreenDraggable: React.FC<ScreenDraggableProps> = ({
       if (!position && ref.current) {
           const rect = ref.current.getBoundingClientRect();
           startPosRef.current = { x: rect.left, y: rect.top };
+          positionRef.current = { x: rect.left, y: rect.top };
       } else if (position) {
           startPosRef.current = { x: position.x, y: position.y };
+          positionRef.current = { x: position.x, y: position.y };
       }
 
       dragStartRef.current = { x: e.clientX, y: e.clientY };

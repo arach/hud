@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import HUDFrame from './components/HUDFrame';
+import type { CanvasDebugState } from './components/Canvas';
 import ChatInterface from './components/ChatInterface';
 import TaskManager from './components/TaskManager';
 import Minimap from './components/Minimap';
@@ -19,15 +20,17 @@ import LogViewer from './components/tools/LogViewer';
 import SystemMonitor from './components/SystemMonitor';
 import CommandPalette, { CommandOption } from './components/CommandPalette';
 import ContextBar, { ContextDef } from './components/ContextBar';
-import ContextDock from './components/ContextDock';
+import ContextDock, { ViewMode } from './components/ContextDock';
 import ContextManifest from './components/ContextManifest'; 
 import ContextZone from './components/ContextZone';
 import SectorLocator from './components/SectorLocator';
 import { ScreenDraggable } from './components/ScreenDraggable';
-import { WindowState } from './types';
+import InspectorPanel from './components/InspectorPanel';
 import { useNexus } from './contexts/NexusContext';
 import { INITIAL_SYSTEM_INSTRUCTION, HUD_TOOLS } from './constants';
 import { useLiveSession } from './hooks/useLiveSession';
+import { matchesNamespace, DEFAULT_NAMESPACE_QUERY } from './lib/namespace';
+import { logPanEvent, HUD_PAN_EVENT, HudLogEntry } from './lib/hudLogger';
 import { 
   LayoutTemplate, 
   Terminal, 
@@ -53,7 +56,21 @@ const App: React.FC = () => {
   const [isCmdPaletteOpen, setIsCmdPaletteOpen] = useState(false);
   const [isTerminalOpen, setIsTerminalOpen] = useState(false);
   const [isTerminalMaximized, setIsTerminalMaximized] = useState(false);
+  const [isLogDockOpen, setIsLogDockOpen] = useState(false);
   const [selectedWindowId, setSelectedWindowId] = useState<string | null>(null);
+  const [selectedContextId, setSelectedContextId] = useState<string | null>(null);
+  const [selectedFilter, setSelectedFilter] = useState<{ kind: 'view'; id: ViewMode } | null>(null);
+  const [isPanActive, setIsPanActive] = useState(false);
+  const [isPanSettling, setIsPanSettling] = useState(false);
+  const [pendingContextFocusId, setPendingContextFocusId] = useState<string | null>(null);
+  const [hudLogs, setHudLogs] = useState<HudLogEntry[]>([]);
+  const [canvasDebug, setCanvasDebug] = useState<CanvasDebugState | null>(null);
+  const canvasDebugRef = useRef<CanvasDebugState | null>(null);
+  const panOffsetRef = useRef(panOffset);
+  const scaleRef = useRef(scale);
+  const viewportRef = useRef(viewport);
+  const panSettleTimerRef = useRef<number | null>(null);
+  const focusDebugTimerRef = useRef<number | null>(null);
   
   // Transition State
   const [isTransitioning, setIsTransitioning] = useState(false);
@@ -66,6 +83,7 @@ const App: React.FC = () => {
     activeThreads,
     activeContextId,
     activeView,
+    namespaceQuery,
     isProcessing,
     contexts,
     sendMessage,
@@ -73,6 +91,7 @@ const App: React.FC = () => {
     completeTask,
     setActiveContextId,
     setActiveView,
+    setNamespaceQuery,
     updateWindow,
     closeWindow,
     restoreContextDefaults,
@@ -85,10 +104,6 @@ const App: React.FC = () => {
 
   // -- Effects --
   useEffect(() => {
-    const handleResize = () => {
-        setViewport({ width: window.innerWidth, height: window.innerHeight });
-    };
-    
     const handleKeyDown = (e: KeyboardEvent) => {
         if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
             e.preventDefault();
@@ -100,15 +115,119 @@ const App: React.FC = () => {
         }
     };
 
-    window.addEventListener('resize', handleResize);
     window.addEventListener('keydown', handleKeyDown);
     return () => {
-        window.removeEventListener('resize', handleResize);
         window.removeEventListener('keydown', handleKeyDown);
     };
   }, []);
 
+  const handleViewportChange = useCallback((next: { width: number; height: number }) => {
+    const maxWidth = window.innerWidth;
+    const maxHeight = window.innerHeight;
+    const clamped = {
+      width: Math.min(next.width, maxWidth),
+      height: Math.min(next.height, maxHeight)
+    };
+    setViewport(prev => {
+      if (prev.width === clamped.width && prev.height === clamped.height) return prev;
+      logPanEvent('viewport', { prev, next: clamped, raw: next, max: { width: maxWidth, height: maxHeight } });
+      return clamped;
+    });
+  }, []);
+
+  const handleCanvasDebug = useCallback((state: CanvasDebugState) => {
+    canvasDebugRef.current = state;
+    setCanvasDebug(state);
+  }, []);
+
+  useEffect(() => {
+    const handleHudPanLog = (event: Event) => {
+      const detail = (event as CustomEvent<HudLogEntry>).detail;
+      if (!detail) return;
+      setHudLogs(prev => {
+        const next = [...prev, detail];
+        return next.slice(-80);
+      });
+    };
+    window.addEventListener(HUD_PAN_EVENT, handleHudPanLog as EventListener);
+    return () => window.removeEventListener(HUD_PAN_EVENT, handleHudPanLog as EventListener);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (panSettleTimerRef.current) {
+        window.clearTimeout(panSettleTimerRef.current);
+      }
+      if (focusDebugTimerRef.current) {
+        window.clearTimeout(focusDebugTimerRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    panOffsetRef.current = panOffset;
+  }, [panOffset]);
+
+  useEffect(() => {
+    scaleRef.current = scale;
+  }, [scale]);
+
+  useEffect(() => {
+    viewportRef.current = viewport;
+  }, [viewport]);
+
+  const setPanOffsetWithLog = useCallback((next: { x: number; y: number }, source: string) => {
+    setPanOffset(prev => {
+      logPanEvent('set', { source, prev, next, viewport, scale, canvas: canvasDebugRef.current });
+      return next;
+    });
+  }, [viewport, scale]);
+
   // -- Focus / Recenter Logic --
+  const getHudSafeViewport = useCallback(() => {
+      const base = viewportRef.current;
+      const width = base.width || window.innerWidth;
+      const height = base.height || window.innerHeight;
+      let left = 0;
+      let right = 0;
+      let top = 0;
+      let bottom = 0;
+
+      const manifest = document.querySelector('[data-hud-panel="manifest"]') as HTMLElement | null;
+      if (manifest) {
+        const rect = manifest.getBoundingClientRect();
+        left = Math.max(left, rect.right);
+      }
+      const inspector = document.querySelector('[data-hud-panel="inspector"]') as HTMLElement | null;
+      if (inspector) {
+        const rect = inspector.getBoundingClientRect();
+        right = Math.max(right, width - rect.left);
+      }
+      const contextBar = document.querySelector('[data-hud-panel="context-bar"]') as HTMLElement | null;
+      if (contextBar) {
+        const rect = contextBar.getBoundingClientRect();
+        top = Math.max(top, rect.bottom);
+      }
+      const statusBar = document.querySelector('[data-hud-panel="status-bar"]') as HTMLElement | null;
+      if (statusBar) {
+        const rect = statusBar.getBoundingClientRect();
+        bottom = Math.max(bottom, height - rect.top);
+      }
+
+      const safeWidth = Math.max(0, width - left - right);
+      const safeHeight = Math.max(0, height - top - bottom);
+      return {
+        width,
+        height,
+        left,
+        top,
+        safeWidth,
+        safeHeight,
+        centerX: left + safeWidth / 2,
+        centerY: top + safeHeight / 2
+      };
+  }, []);
+
   const focusContext = useCallback((ctxId: string) => {
       let targetWindows = windows;
       if (ctxId !== 'global') {
@@ -119,7 +238,7 @@ const App: React.FC = () => {
           if (ctxId === 'global') {
               setIsTransitioning(true);
               setScale(0.8);
-              setPanOffset({ x: 0, y: 0 });
+              setPanOffsetWithLog({ x: 0, y: 0 }, 'focusContext');
               setTimeout(() => setIsTransitioning(false), 750);
           }
           return;
@@ -139,29 +258,116 @@ const App: React.FC = () => {
       const centerW = (maxX + minX) / 2;
       const centerH = (maxY + minY) / 2;
 
-      const scaleX = viewport.width / boundingW;
-      const scaleY = viewport.height / boundingH;
+      const safeViewport = getHudSafeViewport();
+      const scaleX = safeViewport.safeWidth / boundingW;
+      const scaleY = safeViewport.safeHeight / boundingH;
       
       let targetScale = Math.min(scaleX, scaleY);
       targetScale = Math.max(0.4, Math.min(targetScale, 1.1));
 
-      const targetPanX = (viewport.width / 2 / targetScale) - centerW;
-      const targetPanY = (viewport.height / 2 / targetScale) - centerH;
+      const targetPanX = (safeViewport.centerX / targetScale) - centerW;
+      const targetPanY = (safeViewport.centerY / targetScale) - centerH;
 
       setIsTransitioning(true);
       setScale(targetScale);
-      setPanOffset({ x: targetPanX, y: targetPanY });
+      logPanEvent('focus', {
+        source: 'focusContext',
+        ctxId,
+        bounds: { minX, minY, maxX, maxY },
+        viewport: { width: safeViewport.width, height: safeViewport.height },
+        scale,
+        targetScale,
+        targetPan: { x: targetPanX, y: targetPanY },
+        canvas: canvasDebugRef.current
+      });
+      setPanOffsetWithLog({ x: targetPanX, y: targetPanY }, 'focusContext');
 
       setTimeout(() => setIsTransitioning(false), 750);
 
-  }, [windows, viewport]);
+      if (focusDebugTimerRef.current) {
+        window.clearTimeout(focusDebugTimerRef.current);
+      }
+      focusDebugTimerRef.current = window.setTimeout(() => {
+        const finalPan = panOffsetRef.current;
+        const finalScale = scaleRef.current;
+        const finalViewport = viewportRef.current;
+        const viewportCenter = {
+          x: finalViewport.width / 2,
+          y: finalViewport.height / 2
+        };
+        const boundsCenter = { x: centerW, y: centerH };
+        const actualCenter = {
+          x: (boundsCenter.x + finalPan.x) * finalScale,
+          y: (boundsCenter.y + finalPan.y) * finalScale
+        };
+        const error = {
+          x: actualCenter.x - viewportCenter.x,
+          y: actualCenter.y - viewportCenter.y
+        };
+        logPanEvent('focus:resolve', {
+          source: 'focusContext',
+          ctxId,
+          boundsCenter,
+          viewportCenter,
+          actualCenter,
+          error,
+          finalPan,
+          finalScale,
+          viewport: finalViewport,
+          targetScale,
+          targetPan: { x: targetPanX, y: targetPanY },
+          canvas: canvasDebugRef.current
+        });
+      }, 800);
+
+  }, [windows, scale, setPanOffsetWithLog, getHudSafeViewport]);
+
+  useEffect(() => {
+    if (!pendingContextFocusId) return;
+    if (activeView !== 'spatial') return;
+    if (activeContextId !== pendingContextFocusId) return;
+    const targetId = pendingContextFocusId;
+    setPendingContextFocusId(null);
+    window.requestAnimationFrame(() => focusContext(targetId));
+  }, [pendingContextFocusId, activeView, activeContextId, focusContext]);
 
   // -- Handlers --
-  const handlePan = useCallback((delta: { x: number; y: number }) => {
-    setPanOffset(prev => ({
-        x: prev.x + delta.x,
-        y: prev.y + delta.y
-    }));
+  const handlePan = useCallback((delta: { x: number; y: number }, source = 'canvas') => {
+    if (isTransitioning) {
+      logPanEvent('skip', { source, reason: 'transitioning', canvas: canvasDebugRef.current }, true);
+      return;
+    }
+    setPanOffset(prev => {
+        const next = {
+          x: prev.x + delta.x,
+          y: prev.y + delta.y
+        };
+        logPanEvent('delta', { source, delta, prev, next, viewport, scale, canvas: canvasDebugRef.current }, true);
+        return next;
+    });
+  }, [viewport, scale, isTransitioning]);
+
+  const handlePanStart = useCallback(() => {
+    if (panSettleTimerRef.current) {
+      window.clearTimeout(panSettleTimerRef.current);
+      panSettleTimerRef.current = null;
+    }
+    setIsPanSettling(false);
+    setIsPanActive(true);
+    logPanEvent('start', { source: 'canvas', canvas: canvasDebugRef.current });
+  }, []);
+
+  const handlePanEnd = useCallback(() => {
+    setIsPanActive(false);
+    setIsPanSettling(true);
+    logPanEvent('end', { source: 'canvas', canvas: canvasDebugRef.current });
+    if (panSettleTimerRef.current) {
+      window.clearTimeout(panSettleTimerRef.current);
+    }
+    panSettleTimerRef.current = window.setTimeout(() => {
+      setIsPanSettling(false);
+      panSettleTimerRef.current = null;
+    }, 350);
   }, []);
 
   const handleZoom = useCallback((newScale: number) => {
@@ -182,18 +388,23 @@ const App: React.FC = () => {
 
   const handleWindowSelect = useCallback((id: string) => {
     setSelectedWindowId(id);
+    setSelectedContextId(null);
+    setSelectedFilter(null);
     selectWindow(id);
   }, [selectWindow]);
 
   const handleNavigate = useCallback((newPanX: number, newPanY: number) => {
-      setPanOffset({ x: newPanX, y: newPanY });
-  }, []);
+      setPanOffsetWithLog({ x: newPanX, y: newPanY }, 'minimap');
+  }, [setPanOffsetWithLog]);
 
   const handleContextSelect = useCallback((ctx: ContextDef) => {
       setActiveView('spatial');
       setActiveContextId(ctx.id);
-      focusContext(ctx.id);
-  }, [setActiveContextId, setActiveView, focusContext]);
+      setSelectedContextId(ctx.id);
+      setSelectedWindowId(null);
+      setSelectedFilter(null);
+      setPendingContextFocusId(ctx.id);
+  }, [setActiveContextId, setActiveView]);
 
   const handleAutoLayout = useCallback(() => {
     resetLayout();
@@ -202,6 +413,8 @@ const App: React.FC = () => {
 
   const handleFocusWindow = useCallback((id: string) => {
       setSelectedWindowId(id);
+      setSelectedContextId(null);
+      setSelectedFilter(null);
       
       if (id === 'terminal') {
           setIsTerminalOpen(true);
@@ -216,8 +429,9 @@ const App: React.FC = () => {
       if (win) {
           setIsTransitioning(true);
           const fitPadding = 1.4;
-          const scaleX = viewport.width / (win.w * fitPadding);
-          const scaleY = viewport.height / (win.h * fitPadding);
+          const safeViewport = getHudSafeViewport();
+          const scaleX = safeViewport.safeWidth / (win.w * fitPadding);
+          const scaleY = safeViewport.safeHeight / (win.h * fitPadding);
           
           let targetScale = Math.min(scaleX, scaleY);
           targetScale = Math.max(0.5, Math.min(targetScale, 1.2));
@@ -225,15 +439,28 @@ const App: React.FC = () => {
           const winCenterX = win.x + (win.w / 2);
           const winCenterY = win.y + (win.h / 2);
 
-          const targetPanX = (viewport.width / 2 / targetScale) - winCenterX;
-          const targetPanY = (viewport.height / 2 / targetScale) - winCenterY;
+          const targetPanX = (safeViewport.centerX / targetScale) - winCenterX;
+          const targetPanY = (safeViewport.centerY / targetScale) - winCenterY;
 
           setScale(targetScale);
-          setPanOffset({ x: targetPanX, y: targetPanY });
+          setPanOffsetWithLog({ x: targetPanX, y: targetPanY }, 'focusWindow');
 
           setTimeout(() => setIsTransitioning(false), 750);
       }
-  }, [focusWindowInContext, activeView, viewport, setActiveView]);
+  }, [focusWindowInContext, activeView, getHudSafeViewport, setActiveView, setPanOffsetWithLog]);
+
+  const handleContextZoneSelect = useCallback((contextId: string) => {
+      setSelectedContextId(contextId);
+      setSelectedWindowId(null);
+      setSelectedFilter(null);
+  }, []);
+
+  const handleViewSelect = useCallback((view: ViewMode) => {
+      setActiveView(view);
+      setSelectedFilter({ kind: 'view', id: view });
+      setSelectedWindowId(null);
+      setSelectedContextId(null);
+  }, [setActiveView]);
 
   // -- Task Discussion Handler --
   const handleDiscussTask = useCallback((taskId: string) => {
@@ -286,10 +513,10 @@ const App: React.FC = () => {
      return `
 ${INITIAL_SYSTEM_INSTRUCTION}
 CURRENT HUD ENVIRONMENT:
-- Active Context: ${activeContextId.toUpperCase()}
+- Scope Query: ${namespaceQuery}
 - Active View Mode: ${activeView.toUpperCase()}
 `;
-  }, [activeView, activeContextId]);
+  }, [activeView, namespaceQuery]);
 
   const { connect: connectVoice, disconnect: disconnectVoice, isConnected: isVoiceConnected, transcripts } = useLiveSession({
     onToolCall: handleToolCall,
@@ -304,7 +531,8 @@ CURRENT HUD ENVIRONMENT:
   };
 
   const handleTextSendMessage = (text: string) => {
-      const scope = activeView !== 'spatial' ? activeView.toUpperCase() : undefined;
+      const viewScope = activeView !== 'spatial' ? ` | ${activeView.toUpperCase()}` : '';
+      const scope = `${namespaceQuery}${viewScope}`;
       sendMessage(text, scope);
   };
 
@@ -329,14 +557,41 @@ CURRENT HUD ENVIRONMENT:
     { id: 'toggle-term', label: 'Toggle Terminal', action: () => setIsTerminalOpen(p => !p), icon: <Terminal size={16} />, shortcut: 'Ctrl+`' },
     { id: 'toggle-voice', label: 'Toggle Voice Mode', action: toggleVoice, icon: <Mic size={16} /> },
     { id: 'reset', label: 'Reset Global View', action: () => { handleAutoLayout(); }, icon: <Globe size={16} />, shortcut: '⌘R' },
-    { id: 'view-term', label: 'View: Terminal Grid', action: () => setActiveView('terminals'), icon: <Terminal size={16} /> },
-    { id: 'view-code', label: 'View: Editor Grid', action: () => setActiveView('editors'), icon: <Code size={16} /> },
-    { id: 'view-vis', label: 'View: Visual Grid', action: () => setActiveView('visuals'), icon: <LayoutGrid size={16} /> },
+    { id: 'view-term', label: 'View: Terminal Grid', action: () => handleViewSelect('terminals'), icon: <Terminal size={16} /> },
+    { id: 'view-code', label: 'View: Editor Grid', action: () => handleViewSelect('editors'), icon: <Code size={16} /> },
+    { id: 'view-vis', label: 'View: Visual Grid', action: () => handleViewSelect('visuals'), icon: <LayoutGrid size={16} /> },
   ];
 
   const isCompactMode = isTerminalOpen || isVoiceConnected;
-  const activeContextWindows = windows.filter(w => w.contextId === activeContextId);
-  const isContextEmpty = activeContextId !== 'global' && activeContextWindows.length === 0;
+  const scopedWindows = useMemo(() => {
+    return windows.filter(win => matchesNamespace(namespaceQuery, win.namespace));
+  }, [windows, namespaceQuery]);
+  const isScoped = namespaceQuery !== DEFAULT_NAMESPACE_QUERY;
+  const isFilterActive = isScoped || activeView !== 'spatial';
+  const canRestoreDefaults = activeContextId !== 'global';
+  const isScopeEmpty = isScoped && scopedWindows.length === 0;
+  const shouldShowZones = !isPanActive && !isPanSettling;
+  const visibleZones = useMemo(() => {
+    if (activeView !== 'spatial') return [];
+    if (activeContextId === 'global') {
+      return isScoped ? [] : contexts.filter(ctx => ctx.id !== 'global');
+    }
+    return contexts.filter(ctx => ctx.id === activeContextId);
+  }, [activeView, activeContextId, contexts, isScoped]);
+  const contextSizes = useMemo(() => {
+    const sizes: Record<string, { width: number; height: number }> = {};
+    contexts.forEach(ctx => {
+      if (ctx.id === 'global') return;
+      let width = 1220;
+      let height = 800;
+      if (ctx.id === 'dev') { width = 1220; height = 620; }
+      if (ctx.id === 'design') { width = 1220; height = 770; }
+      if (ctx.id === 'ops') { width = 1220; height = 770; }
+      if (ctx.id === 'studio') { width = 1220; height = 720; }
+      sizes[ctx.id] = { width, height };
+    });
+    return sizes;
+  }, [contexts]);
 
   return (
     <>
@@ -345,35 +600,80 @@ CURRENT HUD ENVIRONMENT:
         scale={scale} 
         onPan={handlePan} 
         onZoom={handleZoom}
+        onPanStart={handlePanStart}
+        onPanEnd={handlePanEnd}
         isTransitioning={isTransitioning}
         activeContextId={activeContextId}
+        filterActive={isFilterActive}
+        onCanvasDebug={handleCanvasDebug}
+        onViewportChange={handleViewportChange}
         hud={
           <>
             <ContextBar 
                 contexts={contexts} 
                 activeContextId={activeContextId} 
-                onSelect={handleContextSelect} 
+                onSelect={handleContextSelect}
+                namespaceQuery={namespaceQuery}
+                onNamespaceQueryChange={setNamespaceQuery}
+                logsOpen={isLogDockOpen}
+                onToggleLogs={() => setIsLogDockOpen(prev => !prev)}
             />
 
-            <ContextDock 
-                activeView={activeView}
-                onSelectView={setActiveView}
-                activeThreads={activeThreads}
-            />
+            <ScreenDraggable
+                initialRight={24}
+                initialTop={112}
+                storageKey="hud:context-dock:top"
+                className="z-[70]"
+            >
+              <ContextDock 
+                  activeView={activeView}
+                  onSelectView={handleViewSelect}
+                  activeThreads={activeThreads}
+                  isFixed={false}
+                  orientation="horizontal"
+              />
+            </ScreenDraggable>
             
             <ContextManifest 
                 activeContextId={activeContextId} 
-                windows={activeContextWindows}
+                windows={scopedWindows}
                 tasks={tasks} 
-                contextLabel={contexts.find(c => c.id === activeContextId)?.label}
+                contextLabel={contexts.find(c => c.id === activeContextId)?.label || 'CUSTOM'}
                 onItemClick={handleFocusWindow}
                 onDiscuss={handleDiscussTask} // Wired up
+                namespaceQuery={namespaceQuery}
+                activeView={activeView}
+                contexts={contexts}
+                contextSizes={contextSizes}
+                selectedWindowId={selectedWindowId}
+                selectedContextId={selectedContextId}
+                selectedFilter={selectedFilter}
+                hudLogs={hudLogs}
+                canvasDebug={canvasDebug}
+                panOffset={panOffset}
+                scale={scale}
+                forceDebug={isLogDockOpen}
+            />
+
+            <InspectorPanel
+                windows={windows}
+                selectedWindowId={selectedWindowId}
+                selectedContextId={selectedContextId}
+                selectedFilter={selectedFilter}
+                namespaceQuery={namespaceQuery}
+                activeView={activeView}
+                activeContextId={activeContextId}
+                contexts={contexts}
+                contextSizes={contextSizes}
+                canvasDebug={canvasDebug}
+                panOffset={panOffset}
+                scale={scale}
             />
             
             {/* Enhanced Sector Locator */}
-            {activeView === 'spatial' && !isContextEmpty && (
+            {activeView === 'spatial' && scopedWindows.length > 0 && (
               <SectorLocator 
-                windows={activeContextId === 'global' ? windows : activeContextWindows} 
+                windows={scopedWindows} 
                 viewport={viewport}
                 panOffset={panOffset}
                 scale={scale}
@@ -385,7 +685,7 @@ CURRENT HUD ENVIRONMENT:
               <ScreenDraggable initialLeft={32} initialBottom={32}>
                 <div className="w-[200px] h-[150px] border border-neutral-800 bg-black">
                     <Minimap 
-                        windows={windows} 
+                        windows={scopedWindows} 
                         viewport={{ ...viewport, x: -panOffset.x, y: -panOffset.y }} 
                         panOffset={panOffset} 
                         appScale={scale} 
@@ -431,6 +731,13 @@ CURRENT HUD ENVIRONMENT:
                             {isTerminalOpen ? <ChevronUp size={14} className="rotate-180" /> : <Terminal size={14} />}
                           </button>
                           <button onClick={() => setScale(s => Math.max(0.2, s - 0.2))} className="w-8 h-full flex items-center justify-center hover:bg-neutral-800 text-neutral-400 hover:text-white transition-colors border-r border-neutral-800"><ZoomOut size={14} /></button>
+                          <button
+                            onClick={handleAutoLayout}
+                            className="px-2 h-full flex items-center justify-center text-[10px] font-mono font-bold text-neutral-400 hover:text-white hover:bg-neutral-800 transition-colors border-r border-neutral-800"
+                            title="Recenter & reset layout"
+                          >
+                            {Math.round(scale * 100)}%
+                          </button>
                           <button onClick={() => setScale(s => Math.min(3, s + 0.2))} className="w-8 h-full flex items-center justify-center hover:bg-neutral-800 text-neutral-400 hover:text-white transition-colors"><ZoomIn size={14} /></button>
                       </div>
                   </div>
@@ -443,7 +750,7 @@ CURRENT HUD ENVIRONMENT:
                 onToggleMaximize={() => setIsTerminalMaximized(p => !p)}
                 isMaximized={isTerminalMaximized}
                 activeContextLabel={contexts.find(c => c.id === activeContextId)?.label}
-                activeScope={activeView.toUpperCase()}
+                activeScope={namespaceQuery}
             >
                 <ChatInterface 
                   messages={messages} 
@@ -452,13 +759,14 @@ CURRENT HUD ENVIRONMENT:
                                   isConnected={isVoiceConnected}
                                   transcripts={transcripts}
                                   isActive={isTerminalOpen}
-                                  activeScope={activeView.toUpperCase()}
+                                  activeScope={namespaceQuery}
                                   onRequireAuth={checkAuth}
                                 />
                              </TerminalDrawer>
             <StatusBar 
                 panOffset={panOffset} 
                 scale={scale} 
+                viewport={viewport}
                 activeContextId={activeContextId}
                 isVoiceConnected={isVoiceConnected}
                 isCompact={isCompactMode}
@@ -473,7 +781,7 @@ CURRENT HUD ENVIRONMENT:
                 commands={commandList} 
             />
 
-            {isContextEmpty && (
+            {isScopeEmpty && (
                 <div className="fixed inset-0 flex items-center justify-center z-40 pointer-events-none">
                     <div className="bg-black/80 backdrop-blur-xl border border-neutral-800 p-8 rounded-2xl flex flex-col items-center gap-4 animate-in zoom-in-95 fade-in duration-500 pointer-events-auto shadow-[0_0_50px_rgba(0,0,0,0.8)]">
                         <div className="w-16 h-16 rounded-full bg-neutral-900 border border-neutral-800 flex items-center justify-center mb-2 shadow-inner">
@@ -482,36 +790,37 @@ CURRENT HUD ENVIRONMENT:
                         <div className="text-center">
                             <h2 className="text-xl font-bold text-white tracking-tight mb-1">System Offline</h2>
                             <p className="text-neutral-400 text-xs font-mono max-w-[200px]">
-                                No active modules found in <span className="text-emerald-500">{contexts.find(c => c.id === activeContextId)?.label}</span> sector.
+                                No active modules found for <span className="text-emerald-500">{namespaceQuery}</span>.
                             </p>
                         </div>
-                        <button 
-                            onClick={() => restoreContextDefaults(activeContextId)}
-                            className="px-6 py-2 bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-sm tracking-wide rounded-full transition-all hover:scale-105 shadow-[0_0_20px_rgba(16,185,129,0.3)] mt-2"
-                        >
-                            Initialize Protocol
-                        </button>
+                        {canRestoreDefaults && (
+                            <button 
+                                onClick={() => restoreContextDefaults(activeContextId)}
+                                className="px-6 py-2 bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-sm tracking-wide rounded-full transition-all hover:scale-105 shadow-[0_0_20px_rgba(16,185,129,0.3)] mt-2"
+                            >
+                                Initialize Protocol
+                            </button>
+                        )}
                     </div>
                 </div>
             )}
           </>
         }
       >
-          {activeView === 'spatial' && contexts.filter(c => c.id !== 'global').map(ctx => {
-              let width = 1220; 
-              let height = 800;
-              if (ctx.id === 'dev') { width = 1220; height = 620; }
-              if (ctx.id === 'design') { width = 1220; height = 770; }
-              if (ctx.id === 'ops') { width = 1220; height = 770; }
-              if (ctx.id === 'studio') { width = 1220; height = 720; }
+          {visibleZones.map(ctx => {
+              const size = contextSizes[ctx.id] || { width: 1220, height: 800 };
 
               return (
                   <ContextZone 
                       key={ctx.id} 
                       context={ctx} 
                       isActive={activeContextId === 'global' || activeContextId === ctx.id}
-                      width={width}
-                      height={height}
+                      isSelected={selectedContextId === ctx.id}
+                      isVisible={shouldShowZones}
+                      width={size.width}
+                      height={size.height}
+                      onSelect={handleContextZoneSelect}
+                      panOffset={panOffset}
                   />
               );
           })}

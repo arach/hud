@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { Message, Task, WindowState, AiThread } from '../types';
+import { Message, Task, WindowState, AiThread, WindowType } from '../types';
 import { MOCK_TASKS, INITIAL_SYSTEM_INSTRUCTION } from '../constants';
 import { geminiService } from '../services/geminiService';
 import { useAuth } from './AuthContext';
@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { ContextDef } from '../components/ContextBar';
 import { ViewMode } from '../components/ContextDock';
+import { matchesNamespace, deriveContextIdFromQuery, normalizeNamespaceQuery, DEFAULT_NAMESPACE_QUERY } from '../lib/namespace';
 
 // --- LAYOUT SYSTEM CONSTANTS ---
 // We define a coordinate system where contexts are spaced out generously.
@@ -30,6 +31,10 @@ const layout = (origin: {x: number, y: number}, x: number, y: number, w: number,
     h
 });
 
+const buildNamespace = (contextId: string, type: WindowType, id: string, groups: string[] = []) => {
+  return ['hud', contextId, type, ...groups, id].join('.');
+};
+
 export const CONTEXTS: ContextDef[] = [
   { id: 'global', label: 'GLOBAL NETWORK', x: 0, y: 0, color: '#ec4899', icon: <Globe size={18} /> }, 
   { id: 'dev', label: 'DEV CORE', ...ORIGIN_DEV, color: '#10b981', icon: <Code2 size={18} /> },
@@ -41,33 +46,33 @@ export const CONTEXTS: ContextDef[] = [
 const DEFAULT_WINDOWS: WindowState[] = [
     // --- DEV CORE (Bento Grid) ---
     // Main Code Editor takes left side
-    { id: 'code', contextId: 'dev', type: 'editor', title: 'Code Editor', ...layout(ORIGIN_DEV, 0, 0, 800, 620), zIndex: 10 },
+    { id: 'code', contextId: 'dev', namespace: buildNamespace('dev', 'editor', 'code'), type: 'editor', title: 'Code Editor', ...layout(ORIGIN_DEV, 0, 0, 800, 620), zIndex: 10 },
     // Docs top right
-    { id: 'docs', contextId: 'dev', type: 'editor', title: 'Documentation', ...layout(ORIGIN_DEV, 820, 0, 400, 400), zIndex: 9 },
+    { id: 'docs', contextId: 'dev', namespace: buildNamespace('dev', 'editor', 'docs'), type: 'editor', title: 'Documentation', ...layout(ORIGIN_DEV, 820, 0, 400, 400), zIndex: 9 },
     // Tasks bottom right
-    { id: 'tasks', contextId: 'dev', type: 'terminal', title: 'Mission Control', ...layout(ORIGIN_DEV, 820, 420, 400, 200), zIndex: 10 },
+    { id: 'tasks', contextId: 'dev', namespace: buildNamespace('dev', 'terminal', 'tasks'), type: 'terminal', title: 'Mission Control', ...layout(ORIGIN_DEV, 820, 420, 400, 200), zIndex: 10 },
 
     // --- BLUEPRINTS (Top Row Split, Bottom Full) ---
     // DB Schema Top Left
-    { id: 'db', contextId: 'design', type: 'visual', title: 'Schema Designer', ...layout(ORIGIN_DESIGN, 0, 0, 600, 450), zIndex: 10 },
+    { id: 'db', contextId: 'design', namespace: buildNamespace('design', 'visual', 'db'), type: 'visual', title: 'Schema Designer', ...layout(ORIGIN_DESIGN, 0, 0, 600, 450), zIndex: 10 },
     // Arch Top Right
-    { id: 'arch', contextId: 'design', type: 'visual', title: 'Architecture', ...layout(ORIGIN_DESIGN, 620, 0, 600, 450), zIndex: 10 },
+    { id: 'arch', contextId: 'design', namespace: buildNamespace('design', 'visual', 'arch'), type: 'visual', title: 'Architecture', ...layout(ORIGIN_DESIGN, 620, 0, 600, 450), zIndex: 10 },
     // Git Timeline Bottom Full
-    { id: 'git', contextId: 'design', type: 'terminal', title: 'Source Control', ...layout(ORIGIN_DESIGN, 0, 470, 1220, 300), zIndex: 10 },
+    { id: 'git', contextId: 'design', namespace: buildNamespace('design', 'terminal', 'git'), type: 'terminal', title: 'Source Control', ...layout(ORIGIN_DESIGN, 0, 470, 1220, 300), zIndex: 10 },
 
     // --- SYSTEM OPS (Top Full, Bottom Split) ---
     // Pipeline Monitor Top Full
-    { id: 'pipeline', contextId: 'ops', type: 'terminal', title: 'CI/CD Pipeline', ...layout(ORIGIN_OPS, 0, 0, 1220, 350), zIndex: 10 },
+    { id: 'pipeline', contextId: 'ops', namespace: buildNamespace('ops', 'terminal', 'pipeline'), type: 'terminal', title: 'CI/CD Pipeline', ...layout(ORIGIN_OPS, 0, 0, 1220, 350), zIndex: 10 },
     // Process Monitor Bottom Left
-    { id: 'process', contextId: 'ops', type: 'terminal', title: 'Process Dashboard', ...layout(ORIGIN_OPS, 0, 370, 600, 400), zIndex: 10 },
+    { id: 'process', contextId: 'ops', namespace: buildNamespace('ops', 'terminal', 'process'), type: 'terminal', title: 'Process Dashboard', ...layout(ORIGIN_OPS, 0, 370, 600, 400), zIndex: 10 },
     // System Logs Bottom Right
-    { id: 'logs', contextId: 'ops', type: 'terminal', title: 'System Logs', ...layout(ORIGIN_OPS, 620, 370, 600, 400), zIndex: 10 },
+    { id: 'logs', contextId: 'ops', namespace: buildNamespace('ops', 'terminal', 'logs'), type: 'terminal', title: 'System Logs', ...layout(ORIGIN_OPS, 620, 370, 600, 400), zIndex: 10 },
 
     // --- VISUAL STUDIO (Left/Right Split) ---
     // UI Preview Large Left
-    { id: 'ui', contextId: 'studio', type: 'visual', title: 'UI Preview', ...layout(ORIGIN_STUDIO, 0, 0, 800, 720), zIndex: 11 },
+    { id: 'ui', contextId: 'studio', namespace: buildNamespace('studio', 'visual', 'ui'), type: 'visual', title: 'UI Preview', ...layout(ORIGIN_STUDIO, 0, 0, 800, 720), zIndex: 11 },
     // Diff Viewer Narrow Right
-    { id: 'diff', contextId: 'studio', type: 'editor', title: 'Diff Viewer', ...layout(ORIGIN_STUDIO, 820, 0, 400, 720), zIndex: 10 },
+    { id: 'diff', contextId: 'studio', namespace: buildNamespace('studio', 'editor', 'diff'), type: 'editor', title: 'Diff Viewer', ...layout(ORIGIN_STUDIO, 820, 0, 400, 720), zIndex: 10 },
 ];
 
 const INITIAL_THREADS: AiThread[] = [
@@ -90,6 +95,7 @@ interface NexusContextType {
   // HUD State
   activeContextId: string;
   activeView: ViewMode;
+  namespaceQuery: string;
   isProcessing: boolean;
   
   // Constants
@@ -103,6 +109,7 @@ interface NexusContextType {
   // Navigation / UI Actions
   setActiveContextId: (id: string) => void;
   setActiveView: (view: ViewMode) => void;
+  setNamespaceQuery: (query: string) => void;
   updateWindow: (id: string, updates: Partial<WindowState>) => void;
   closeWindow: (id: string) => void; // New
   restoreContextDefaults: (contextId: string) => void; // New
@@ -139,8 +146,9 @@ export const NexusProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   // -- State: Ephemeral --
   const [windows, setWindows] = useState<WindowState[]>(DEFAULT_WINDOWS);
   const [activeThreads, setActiveThreads] = useState<AiThread[]>(INITIAL_THREADS);
-  const [activeContextId, setActiveContextId] = useState<string>('global'); // Default to Global
+  const [activeContextIdState, setActiveContextIdState] = useState<string>('global'); // Default to Global
   const [activeView, setActiveView] = useState<ViewMode>('spatial');
+  const [namespaceQuery, setNamespaceQueryState] = useState<string>(DEFAULT_NAMESPACE_QUERY);
   const [isProcessing, setIsProcessing] = useState(false);
 
   // -- Persistence Effects --
@@ -162,7 +170,6 @@ export const NexusProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         parts: [{ text: m.content }]
     }));
     geminiService.startChat(history);
-  }, [hasApiKey]); // Run when API key becomes available
   }, [hasApiKey]); // Run when API key becomes available
 
   // -- Actions --
@@ -236,6 +243,18 @@ export const NexusProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, [tasks, createTask, completeTask]);
 
   // -- Window & UI Actions --
+  const setActiveContextId = useCallback((id: string) => {
+    setActiveContextIdState(id);
+    const nextQuery = id === 'global' ? DEFAULT_NAMESPACE_QUERY : `hud.${id}.**`;
+    setNamespaceQueryState(nextQuery);
+  }, []);
+
+  const setNamespaceQuery = useCallback((query: string) => {
+    const normalized = normalizeNamespaceQuery(query);
+    setNamespaceQueryState(normalized);
+    const derived = deriveContextIdFromQuery(normalized, CONTEXTS.map(ctx => ctx.id));
+    setActiveContextIdState(derived);
+  }, []);
 
   const updateWindow = useCallback((id: string, updates: Partial<WindowState>) => {
     setWindows(prev => prev.map(w => w.id === id ? { ...w, ...updates } : w));
@@ -268,16 +287,17 @@ export const NexusProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const resetLayout = useCallback(() => {
     setWindows(DEFAULT_WINDOWS);
-    setActiveContextId('global');
+    setActiveContextIdState('global');
     setActiveView('spatial');
+    setNamespaceQueryState(DEFAULT_NAMESPACE_QUERY);
   }, []);
 
   // -- SYNTHETIC LAYOUT ENGINE (HIERARCHICAL) --
   const getSyntheticLayout = useCallback((win: WindowState, viewport: {width: number, height: number}, panOffset: {x: number, y: number}, scale: number) => {
       
-      // -- FILTER LEVEL 1: SCOPE (Top Bar) --
-      // If we are not in 'global', and the window's context doesn't match, it is hidden.
-      if (activeContextId !== 'global' && win.contextId !== activeContextId) {
+      // -- FILTER LEVEL 1: SCOPE (Namespace Query) --
+      // If the window doesn't match the active namespace query, it is hidden.
+      if (!matchesNamespace(namespaceQuery, win.namespace)) {
           return {
               x: win.x,
               y: win.y,
@@ -324,7 +344,7 @@ export const NexusProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       // 1. Get list of ALL windows that satisfy the current Scope AND View filters
       const matchingWindows = [...windows]
           .filter(w => {
-              const scopeMatch = activeContextId === 'global' || w.contextId === activeContextId;
+              const scopeMatch = matchesNamespace(namespaceQuery, w.namespace);
               
               let typeMatch = true;
               if (activeView === 'terminals' && w.type !== 'terminal') typeMatch = false;
@@ -364,7 +384,7 @@ export const NexusProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           opacity: 1,
           pointerEvents: 'auto' as const
       };
-  }, [activeContextId, activeView, windows]);
+  }, [activeView, windows, namespaceQuery]);
 
   return (
     <NexusContext.Provider value={{
@@ -372,8 +392,9 @@ export const NexusProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       tasks,
       windows,
       activeThreads,
-      activeContextId,
+      activeContextId: activeContextIdState,
       activeView,
+      namespaceQuery,
       isProcessing,
       contexts: CONTEXTS,
       sendMessage,
@@ -381,6 +402,7 @@ export const NexusProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       completeTask,
       setActiveContextId,
       setActiveView,
+      setNamespaceQuery,
       updateWindow,
       closeWindow,
       restoreContextDefaults,

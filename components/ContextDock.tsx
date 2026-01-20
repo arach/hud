@@ -14,9 +14,16 @@ interface ContextDockProps {
   activeView: ViewMode;
   onSelectView: (view: ViewMode) => void;
   activeThreads: AiThread[];
+  className?: string;
+  isFixed?: boolean;
+  orientation?: 'vertical' | 'horizontal';
 }
 
-const ContextDock: React.FC<ContextDockProps> = ({ activeView, onSelectView, activeThreads }) => {
+const ContextDock: React.FC<ContextDockProps> = ({ activeView, onSelectView, activeThreads, className = '', isFixed = true, orientation = 'vertical' }) => {
+  const isHorizontal = orientation === 'horizontal';
+  const dockPositionClass = isFixed
+    ? (isHorizontal ? 'fixed right-6 top-6 z-50' : 'fixed left-6 top-1/2 -translate-y-1/2 z-50')
+    : '';
   
   // Calculate active thread counts per view type for the bubbles
   const getThreadCount = (mode: ViewMode) => {
@@ -35,10 +42,10 @@ const ContextDock: React.FC<ContextDockProps> = ({ activeView, onSelectView, act
 
   return (
     <div 
-        className="fixed left-6 top-1/2 -translate-y-1/2 z-50 flex flex-col gap-6 pointer-events-auto"
+        className={`${dockPositionClass} flex ${isHorizontal ? 'flex-row' : 'flex-col'} gap-6 pointer-events-auto ${className}`}
     >
       {/* Main Navigation Pill */}
-      <div className="flex flex-col bg-black/80 backdrop-blur-xl border border-neutral-800 rounded-full py-4 px-2 shadow-2xl gap-4">
+      <div className={`flex ${isHorizontal ? 'flex-row items-center px-4 py-2' : 'flex-col py-4 px-2'} bg-black/80 backdrop-blur-xl border border-neutral-800 rounded-full shadow-2xl gap-4`}>
         
         {navItems.map((item) => {
             const isActive = activeView === item.id;
@@ -48,7 +55,7 @@ const ContextDock: React.FC<ContextDockProps> = ({ activeView, onSelectView, act
             return (
                 <div key={item.id} className="relative group flex items-center justify-center shrink-0">
                     {/* Tooltip */}
-                    <div className="absolute left-full ml-4 px-3 py-1.5 bg-neutral-900 border border-neutral-800 rounded text-[10px] font-bold tracking-wider text-neutral-300 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50 shadow-xl flex items-center gap-2">
+                    <div className={`absolute px-3 py-1.5 bg-neutral-900 border border-neutral-800 rounded text-[10px] font-bold tracking-wider text-neutral-300 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50 shadow-xl flex items-center gap-2 ${isHorizontal ? 'bottom-full mb-3 left-1/2 -translate-x-1/2' : 'left-full ml-4'}`}>
                         {item.label}
                         {isActive && <span className="text-emerald-500">• ACTIVE</span>}
                     </div>
@@ -72,7 +79,7 @@ const ContextDock: React.FC<ContextDockProps> = ({ activeView, onSelectView, act
                         {/* Vertical Active Line */}
                         {isActive && (
                             <div 
-                                className="absolute -left-3 top-1/2 -translate-y-1/2 w-0.5 h-6 rounded-full shadow-[0_0_10px_currentColor] transition-all"
+                                className={`${isHorizontal ? 'absolute -bottom-3 left-1/2 -translate-x-1/2 h-0.5 w-6' : 'absolute -left-3 top-1/2 -translate-y-1/2 w-0.5 h-6'} rounded-full shadow-[0_0_10px_currentColor] transition-all`}
                                 style={{ backgroundColor: item.color }}
                             ></div>
                         )}
