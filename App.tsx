@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef, lazy, Suspense } from 'react';
 import HUDFrame from './components/HUDFrame';
 import type { CanvasDebugState } from './components/Canvas';
 import ChatInterface from './components/ChatInterface';
@@ -8,16 +8,18 @@ import StatusBar from './components/StatusBar';
 import VoiceLog from './components/VoiceLog';
 import DraggableWindow from './components/DraggableWindow';
 import TerminalDrawer from './components/TerminalDrawer';
-import DbSchema from './components/tools/DbSchema';
-import ArchDiagram from './components/tools/ArchDiagram';
-import CodeEditor from './components/tools/CodeEditor';
-import GitGraph from './components/tools/GitGraph';
-import DocsEditor from './components/tools/DocsEditor';
-import UiPreview from './components/tools/UiPreview';
-import PipelineMonitor from './components/tools/PipelineMonitor';
-import DiffViewer from './components/tools/DiffViewer';
-import LogViewer from './components/tools/LogViewer';
-import SystemMonitor from './components/SystemMonitor';
+
+// Lazy-loaded tool components for code splitting
+const DbSchema = lazy(() => import('./components/tools/DbSchema'));
+const ArchDiagram = lazy(() => import('./components/tools/ArchDiagram'));
+const CodeEditor = lazy(() => import('./components/tools/CodeEditor'));
+const GitGraph = lazy(() => import('./components/tools/GitGraph'));
+const DocsEditor = lazy(() => import('./components/tools/DocsEditor'));
+const UiPreview = lazy(() => import('./components/tools/UiPreview'));
+const PipelineMonitor = lazy(() => import('./components/tools/PipelineMonitor'));
+const DiffViewer = lazy(() => import('./components/tools/DiffViewer'));
+const LogViewer = lazy(() => import('./components/tools/LogViewer'));
+const SystemMonitor = lazy(() => import('./components/SystemMonitor'));
 import CommandPalette, { CommandOption } from './components/CommandPalette';
 import { ContextDef } from './components/ContextBar';
 import { ViewMode } from './components/ContextDock';
@@ -534,19 +536,25 @@ CURRENT HUD ENVIRONMENT:
       sendMessage(text, scope);
   };
 
+  const ToolLoader = () => (
+    <div className="flex items-center justify-center h-full">
+      <div className="text-neutral-500 text-xs font-mono animate-pulse">Loading module...</div>
+    </div>
+  );
+
   const renderWindowContent = (id: string) => {
     switch(id) {
         case 'tasks': return <TaskManager tasks={tasks} onComplete={completeTask} />;
-        case 'code': return <CodeEditor />;
-        case 'db': return <DbSchema />;
-        case 'arch': return <ArchDiagram />;
-        case 'git': return <GitGraph />;
-        case 'pipeline': return <PipelineMonitor />;
-        case 'diff': return <DiffViewer />;
-        case 'logs': return <LogViewer />;
-        case 'process': return <SystemMonitor />;
-        case 'docs': return <DocsEditor />;
-        case 'ui': return <UiPreview />;
+        case 'code': return <Suspense fallback={<ToolLoader />}><CodeEditor /></Suspense>;
+        case 'db': return <Suspense fallback={<ToolLoader />}><DbSchema /></Suspense>;
+        case 'arch': return <Suspense fallback={<ToolLoader />}><ArchDiagram /></Suspense>;
+        case 'git': return <Suspense fallback={<ToolLoader />}><GitGraph /></Suspense>;
+        case 'pipeline': return <Suspense fallback={<ToolLoader />}><PipelineMonitor /></Suspense>;
+        case 'diff': return <Suspense fallback={<ToolLoader />}><DiffViewer /></Suspense>;
+        case 'logs': return <Suspense fallback={<ToolLoader />}><LogViewer /></Suspense>;
+        case 'process': return <Suspense fallback={<ToolLoader />}><SystemMonitor /></Suspense>;
+        case 'docs': return <Suspense fallback={<ToolLoader />}><DocsEditor /></Suspense>;
+        case 'ui': return <Suspense fallback={<ToolLoader />}><UiPreview /></Suspense>;
         default: return <div className="p-4 text-neutral-500">Module Loading...</div>;
     }
   };
