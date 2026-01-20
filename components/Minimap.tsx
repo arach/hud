@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { WindowState } from '../types';
 import { PANEL_STYLES } from '../lib/hudChrome';
-import { Minimize2, Maximize2, Map } from 'lucide-react';
+import { Minimize2, Maximize2, Map, Maximize } from 'lucide-react';
 
 interface MinimapProps {
   windows: WindowState[];
@@ -17,9 +17,11 @@ interface MinimapProps {
   isCollapsed?: boolean;
   /** Callback to toggle collapsed state */
   onToggleCollapse?: () => void;
+  /** Callback to zoom out and view all windows */
+  onViewAll?: () => void;
 }
 
-const Minimap: React.FC<MinimapProps> = ({ windows, viewport, panOffset, appScale, onNavigate, width, height, fixedPosition = false, isCollapsed = false, onToggleCollapse }) => {
+const Minimap: React.FC<MinimapProps> = ({ windows, viewport, panOffset, appScale, onNavigate, width, height, fixedPosition = false, isCollapsed = false, onToggleCollapse, onViewAll }) => {
   // Dynamic map dimensions with fallback
   const mapW = width || 250;
   const mapH = height || 180;
@@ -245,8 +247,17 @@ const Minimap: React.FC<MinimapProps> = ({ windows, viewport, panOffset, appScal
       
       {/* Footer Info */}
       <div className="h-6 border-t border-neutral-800 bg-neutral-900 flex items-center justify-between px-2 text-[10px] text-neutral-500 font-mono select-none">
-        <span>PAN: {panOffset.x.toFixed(0)},{panOffset.y.toFixed(0)}</span>
-        <span className={isDragging ? 'text-emerald-500' : ''}>{isDragging ? 'DRAGGING' : 'READY'}</span>
+        <span className={isDragging ? 'text-emerald-500' : ''}>{isDragging ? 'DRAGGING' : `${windows.length} items`}</span>
+        {onViewAll && (
+          <button
+            onClick={onViewAll}
+            className="flex items-center gap-1 px-1.5 py-0.5 rounded hover:bg-white/10 hover:text-white transition-colors"
+            title="Zoom to fit all windows"
+          >
+            <Maximize size={10} />
+            <span className="text-[9px]">VIEW ALL</span>
+          </button>
+        )}
       </div>
     </div>
   );

@@ -43,6 +43,7 @@ interface ContextManifestProps {
   // Minimap props
   viewport?: { width: number; height: number };
   onNavigate?: (x: number, y: number) => void;
+  onViewAll?: () => void;
 }
 
 interface LogItem {
@@ -105,7 +106,8 @@ const ContextManifest: React.FC<ContextManifestProps> = ({
   isCollapsed = false,
   onToggleCollapse,
   viewport,
-  onNavigate
+  onNavigate,
+  onViewAll
 }) => {
   const [logs, setLogs] = useState<LogItem[]>([]);
   const [headerText, setHeaderText] = useState('');
@@ -666,6 +668,7 @@ const ContextManifest: React.FC<ContextManifestProps> = ({
                   panOffset={panOffset || { x: 0, y: 0 }}
                   appScale={typeof scale === 'number' ? scale : 1}
                   onNavigate={onNavigate || (() => {})}
+                  onViewAll={onViewAll}
                   width={256}
                   height={160}
                   fixedPosition={false}

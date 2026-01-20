@@ -81,8 +81,8 @@ const NavigationStack: React.FC<NavigationStackProps> = ({
           </div>
         </div>
 
-        {/* RIGHT: Scope Filter */}
-        <div className="flex items-center gap-3 shrink-0">
+        {/* RIGHT: Scope Filter - aligned with Inspector panel */}
+        <div className="flex items-center gap-3 shrink-0 pr-[268px]">
           <div className="flex items-center gap-2">
             <span className="text-[9px] font-bold tracking-widest text-neutral-500 uppercase whitespace-nowrap">Scope Filter</span>
             <div className="relative">

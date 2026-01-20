@@ -268,29 +268,23 @@ const Canvas: React.FC<CanvasProps> = ({ panOffset, scale, onPan, onPanStart, on
         className={`absolute inset-0 z-0 overflow-hidden bg-[#050505] ${canvasCursor}`}
         onMouseDown={handleMouseDown}
     >
-      {/* Blueprint Grid - Major */}
-      <div 
-        className="absolute inset-0 opacity-[0.08] pointer-events-none"
+      {/* Subtle dot pattern - gives sense of navigable space */}
+      <div
+        className="absolute inset-0 opacity-[0.4] pointer-events-none"
         style={{
-            backgroundImage: `
-                linear-gradient(to right, #404050 1px, transparent 1px),
-                linear-gradient(to bottom, #404050 1px, transparent 1px)
-            `,
-            backgroundSize: `${majorGridSize}px ${majorGridSize}px`,
+            backgroundImage: `radial-gradient(circle, #333 1px, transparent 1px)`,
+            backgroundSize: `${minorGridSize}px ${minorGridSize}px`,
             backgroundPosition: `${bgPosX}px ${bgPosY}px`,
             backgroundRepeat: 'repeat'
         }}
       />
-      
-      {/* Blueprint Grid - Minor */}
-      <div 
-        className="absolute inset-0 opacity-[0.04] pointer-events-none"
+
+      {/* Larger dot pattern for depth */}
+      <div
+        className="absolute inset-0 opacity-[0.15] pointer-events-none"
         style={{
-            backgroundImage: `
-                linear-gradient(to right, #303040 1px, transparent 1px),
-                linear-gradient(to bottom, #303040 1px, transparent 1px)
-            `,
-            backgroundSize: `${minorGridSize}px ${minorGridSize}px`,
+            backgroundImage: `radial-gradient(circle, #444 1.5px, transparent 1.5px)`,
+            backgroundSize: `${majorGridSize}px ${majorGridSize}px`,
             backgroundPosition: `${bgPosX}px ${bgPosY}px`,
             backgroundRepeat: 'repeat'
         }}

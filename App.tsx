@@ -652,6 +652,7 @@ CURRENT HUD ENVIRONMENT:
                   onToggleCollapse={() => setIsManifestCollapsed(prev => !prev)}
                   viewport={viewport}
                   onNavigate={handleNavigate}
+                  onViewAll={() => focusContext('global')}
               />
             )}
 
