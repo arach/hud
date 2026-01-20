@@ -107,7 +107,7 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose, comman
         </div>
         
         <div className="px-4 py-1.5 bg-neutral-900/50 border-t border-neutral-800 flex justify-between items-center text-[10px] text-neutral-500 font-mono">
-            <span>Nexus Command Line</span>
+            <span>HUD Command Line</span>
             <span>{filteredCommands.length} matches</span>
         </div>
       </div>

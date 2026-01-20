@@ -4,7 +4,7 @@ import Prism from 'prismjs';
 import 'prismjs/components/prism-markdown';
 
 const DocsEditor: React.FC = () => {
-  const [content, setContent] = useState(`# Nexus Workspace
+  const [content, setContent] = useState(`# HUD Workspace
 
 A **futuristic** coding agent HUD.
 
@@ -20,7 +20,7 @@ A **futuristic** coding agent HUD.
 
 ## Code Example
 \`\`\`javascript
-const agent = new NexusAgent();
+const agent = new HudAgent();
 agent.init();
 \`\`\`
 `);

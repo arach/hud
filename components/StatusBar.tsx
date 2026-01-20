@@ -1,9 +1,19 @@
-import React, { useState, useEffect } from 'react';
-import { Wifi, GitBranch, Activity, Clock, Mic, Terminal, Radio } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Wifi, GitBranch, Activity, Clock, Mic, Terminal, Radio, Map, Maximize2, ChevronDown, Check } from 'lucide-react';
+import { PANEL_STYLES } from '../lib/hudChrome';
+
+const MOCK_BRANCHES = [
+  { name: 'main', isDefault: true },
+  { name: 'feature/hud-structure', isCurrent: true },
+  { name: 'feature/voice-integration', isRecent: true },
+  { name: 'fix/minimap-rendering', isRecent: true },
+  { name: 'develop' },
+];
 
 interface StatusBarProps {
   panOffset: { x: number; y: number };
   scale: number;
+  viewport: { width: number; height: number };
   activeContextId: string;
   isVoiceConnected?: boolean;
   // Compact Mode Props
@@ -11,20 +21,43 @@ interface StatusBarProps {
   onToggleTerminal?: () => void;
   onToggleVoice?: () => void;
   isTerminalOpen?: boolean;
+  // Minimap integration
+  isMinimapCollapsed?: boolean;
+  onToggleMinimap?: () => void;
 }
 
-const StatusBar: React.FC<StatusBarProps> = ({ 
-  panOffset, 
-  scale, 
-  activeContextId, 
+const StatusBar: React.FC<StatusBarProps> = ({
+  panOffset,
+  scale,
+  viewport,
+  activeContextId,
   isVoiceConnected,
   isCompact,
   onToggleTerminal,
   onToggleVoice,
-  isTerminalOpen
+  isTerminalOpen,
+  isMinimapCollapsed = false,
+  onToggleMinimap
 }) => {
   const [time, setTime] = useState(new Date());
   const [latency, setLatency] = useState(24);
+  const [vpCopied, setVpCopied] = useState(false);
+  const [branchMenuOpen, setBranchMenuOpen] = useState(false);
+  const [currentBranch, setCurrentBranch] = useState('feature/hud-structure');
+  const branchMenuRef = useRef<HTMLDivElement>(null);
+
+  // Close branch menu on outside click
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (branchMenuRef.current && !branchMenuRef.current.contains(e.target as Node)) {
+        setBranchMenuOpen(false);
+      }
+    };
+    if (branchMenuOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [branchMenuOpen]);
 
   useEffect(() => {
     const timer = setInterval(() => setTime(new Date()), 1000);
@@ -40,11 +73,47 @@ const StatusBar: React.FC<StatusBarProps> = ({
     };
   }, []);
 
+  const viewportCamera = {
+    x: -panOffset.x,
+    y: -panOffset.y
+  };
+  const viewportSize = {
+    w: viewport.width / scale,
+    h: viewport.height / scale
+  };
+
+  const handleCopyViewport = async () => {
+    const payload = `PAN: ${viewportCamera.x.toFixed(0)},${viewportCamera.y.toFixed(0)} | SIZE: ${viewportSize.w.toFixed(0)}x${viewportSize.h.toFixed(0)} | ZOOM: ${(scale * 100).toFixed(0)}%`;
+    try {
+      await navigator.clipboard.writeText(payload);
+      setVpCopied(true);
+      setTimeout(() => setVpCopied(false), 1500);
+    } catch (error) {
+      console.error('Failed to copy viewport bounds', error);
+    }
+  };
+
   return (
-    <div className="fixed bottom-0 left-0 right-0 h-7 bg-[#09090b]/90 backdrop-blur-md border-t border-neutral-800 flex items-center justify-between px-3 z-[60] select-none font-mono text-[10px] text-neutral-500 pointer-events-auto shadow-[0_-5px_20px_rgba(0,0,0,0.5)]">
+    <div data-hud-panel="status-bar" className={`${PANEL_STYLES.statusBar} h-7 flex items-center justify-between px-3 select-none font-mono text-[10px] text-neutral-500 pointer-events-auto`}>
       
-      {/* LEFT: System Health */}
+      {/* LEFT: System Health + Collapsed Minimap */}
       <div className="flex items-center gap-4">
+        {/* Collapsed Minimap Indicator */}
+        {isMinimapCollapsed && (
+          <>
+            <button
+              onClick={onToggleMinimap}
+              className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-white/5 border border-neutral-800 hover:bg-white/10 transition-colors text-neutral-400 hover:text-white"
+              title="Expand minimap"
+            >
+              <Map size={10} />
+              <span className="text-[9px] font-bold">MAP</span>
+              <Maximize2 size={8} className="opacity-60" />
+            </button>
+            <div className="h-3 w-px bg-neutral-800" />
+          </>
+        )}
+
         <div className="flex items-center gap-2 text-emerald-500">
             <div className="relative flex h-2 w-2">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
@@ -55,10 +124,51 @@ const StatusBar: React.FC<StatusBarProps> = ({
 
         <div className="h-3 w-px bg-neutral-800" />
 
-        <div className="flex items-center gap-1.5 hover:text-neutral-300 transition-colors cursor-pointer">
+        <div className="relative" ref={branchMenuRef}>
+          <button
+            onClick={() => setBranchMenuOpen(!branchMenuOpen)}
+            className="flex items-center gap-1.5 hover:text-neutral-300 transition-colors cursor-pointer"
+          >
             <GitBranch size={10} />
-            <span>main</span>
-            <span className="text-neutral-600">*</span>
+            <span className="max-w-[100px] truncate">{currentBranch}</span>
+            <ChevronDown size={10} className={`transition-transform ${branchMenuOpen ? 'rotate-180' : ''}`} />
+          </button>
+
+          {/* Branch Selector Popup */}
+          {branchMenuOpen && (
+            <div className="absolute bottom-full left-0 mb-2 w-56 bg-black/95 backdrop-blur-xl border border-neutral-800 rounded-lg shadow-xl overflow-hidden z-50 animate-in fade-in slide-in-from-bottom-2 duration-150">
+              <div className="px-3 py-2 border-b border-neutral-800 text-[9px] text-neutral-500 uppercase tracking-widest">
+                Switch Branch
+              </div>
+              <div className="py-1 max-h-48 overflow-y-auto">
+                {MOCK_BRANCHES.map((branch) => (
+                  <button
+                    key={branch.name}
+                    onClick={() => {
+                      setCurrentBranch(branch.name);
+                      setBranchMenuOpen(false);
+                    }}
+                    className={`w-full px-3 py-1.5 flex items-center gap-2 text-left hover:bg-white/5 transition-colors ${
+                      currentBranch === branch.name ? 'bg-white/5' : ''
+                    }`}
+                  >
+                    <div className="w-4 flex justify-center">
+                      {currentBranch === branch.name && <Check size={10} className="text-emerald-500" />}
+                    </div>
+                    <span className={`flex-1 truncate ${currentBranch === branch.name ? 'text-white' : 'text-neutral-400'}`}>
+                      {branch.name}
+                    </span>
+                    {branch.isDefault && (
+                      <span className="text-[8px] px-1.5 py-0.5 rounded bg-neutral-800 text-neutral-500">default</span>
+                    )}
+                    {branch.isRecent && !branch.isCurrent && (
+                      <span className="text-[8px] text-neutral-600">recent</span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="h-3 w-px bg-neutral-800" />
@@ -70,20 +180,31 @@ const StatusBar: React.FC<StatusBarProps> = ({
       </div>
 
       {/* CENTER: Viewport Data (Hidden on mobile or when controls need space) */}
-      <div className={`absolute left-1/2 -translate-x-1/2 flex items-center gap-4 hidden md:flex opacity-70 hover:opacity-100 transition-opacity ${isCompact ? 'opacity-30' : ''}`}>
-         <div className="flex items-center gap-1">
-             <span className="text-neutral-600">X:</span>
-             <span className="tabular-nums w-8 text-right">{panOffset.x.toFixed(0)}</span>
-         </div>
-         <div className="flex items-center gap-1">
-             <span className="text-neutral-600">Y:</span>
-             <span className="tabular-nums w-8 text-right">{panOffset.y.toFixed(0)}</span>
-         </div>
-         <div className="h-3 w-px bg-neutral-800" />
-         <div className="flex items-center gap-1">
-             <span className="text-neutral-600">ZM:</span>
-             <span className="tabular-nums">{(scale * 100).toFixed(0)}%</span>
-         </div>
+      <div className={`absolute left-1/2 -translate-x-1/2 flex items-center gap-3 hidden md:flex opacity-70 hover:opacity-100 transition-opacity ${isCompact ? 'opacity-30' : ''}`}>
+         <button
+             onClick={handleCopyViewport}
+             className="flex items-center gap-3 hover:text-neutral-200 transition-colors cursor-pointer"
+             title="Copy viewport data"
+         >
+             <div className="flex items-center gap-1">
+                 <span className="text-neutral-600">PAN:</span>
+                 <span className={`tabular-nums ${vpCopied ? 'text-emerald-500' : ''}`}>
+                   {viewportCamera.x.toFixed(0)},{viewportCamera.y.toFixed(0)}
+                 </span>
+             </div>
+             <div className="h-3 w-px bg-neutral-800" />
+             <div className="flex items-center gap-1">
+                 <span className="text-neutral-600">SIZE:</span>
+                 <span className={`tabular-nums ${vpCopied ? 'text-emerald-500' : ''}`}>
+                   {viewportSize.w.toFixed(0)}x{viewportSize.h.toFixed(0)}
+                 </span>
+             </div>
+             <div className="h-3 w-px bg-neutral-800" />
+             <div className="flex items-center gap-1">
+                 <span className="text-neutral-600">ZOOM:</span>
+                 <span className={`tabular-nums ${vpCopied ? 'text-emerald-500' : ''}`}>{(scale * 100).toFixed(0)}%</span>
+             </div>
+         </button>
       </div>
 
       {/* RIGHT: Controls & Context */}

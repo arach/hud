@@ -1,5 +1,5 @@
 {
-  "name": "Nexus HUD Workspace",
+  "name": "HUD Workspace",
   "description": "A futuristic, conversational HUD interface where work management meets immersive design. Features an AI-powered assistant for task tracking and real-time system monitoring.",
   "requestFramePermissions": [
     "microphone"

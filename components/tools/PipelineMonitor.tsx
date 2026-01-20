@@ -18,7 +18,7 @@ const PipelineMonitor: React.FC = () => {
   ]);
 
   const [logs, setLogs] = useState<string[]>([
-    '> docker build -t nexus-agent:latest .',
+    '> docker build -t hud-agent:latest .',
     '[+] Building 2.4s (3/3) FINISHED',
     ' => [internal] load build definition from Dockerfile',
     ' => [internal] load metadata for docker.io/library/node:18',
