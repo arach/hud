@@ -642,10 +642,10 @@ const ContextManifest: React.FC<ContextManifestProps> = ({
         <div className="flex-1" />
 
         {/* Minimap Section - Collapsible (bottom-aligned) */}
-        <div className="shrink-0 border-t border-neutral-800/50">
+        <div className="shrink-0 border-t border-neutral-800/50 bg-black/30">
           <button
             onClick={() => setMinimapExpanded(!minimapExpanded)}
-            className="w-full px-3 py-2 flex items-center justify-between text-neutral-400 hover:bg-white/5 transition-colors"
+            className="w-full px-4 py-2.5 flex items-center justify-between text-neutral-400 hover:bg-white/5 transition-colors"
           >
             <div className="flex items-center gap-2">
               <Compass size={12} className={minimapExpanded ? 'text-emerald-400' : 'text-neutral-500'} />
@@ -655,8 +655,8 @@ const ContextManifest: React.FC<ContextManifestProps> = ({
           </button>
 
           {minimapExpanded && (
-            <div className="px-2 pb-2">
-              <div className="rounded-lg overflow-hidden border border-neutral-800">
+            <div className="px-3 pb-3">
+              <div className="rounded overflow-hidden border border-neutral-700/50 bg-neutral-900/50">
                 <Minimap
                   windows={windows}
                   viewport={{
@@ -669,8 +669,8 @@ const ContextManifest: React.FC<ContextManifestProps> = ({
                   appScale={typeof scale === 'number' ? scale : 1}
                   onNavigate={onNavigate || (() => {})}
                   onViewAll={onViewAll}
-                  width={256}
-                  height={160}
+                  width={254}
+                  height={150}
                   fixedPosition={false}
                 />
               </div>
@@ -678,11 +678,6 @@ const ContextManifest: React.FC<ContextManifestProps> = ({
           )}
         </div>
 
-        {/* Footer - Fixed */}
-        <div className="shrink-0 p-3 border-t border-neutral-800/50 flex justify-between text-[8px] text-neutral-600">
-           <span>ALLOC.MEM: OK</span>
-           <span>PID: {Math.floor(Math.random() * 9000) + 1000}</span>
-        </div>
       </div>
     </div>
   );

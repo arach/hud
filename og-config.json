@@ -1,0 +1,13 @@
+{
+  "template": "editor-dark",
+  "title": "HUD",
+  "subtitle": "A spatial canvas for organizing context, windows, and workflows in one unified interface.",
+  "tag": "Developer Tool",
+  "accent": "#10b981",
+  "accentSecondary": "#3b82f6",
+  "background": "#09090b",
+  "textColor": "#f0f4f7",
+  "fonts": ["Inter:wght@400;500;600", "JetBrains Mono:wght@400;500"],
+  "scale": 2,
+  "output": "public/og.png"
+}

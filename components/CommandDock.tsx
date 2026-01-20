@@ -24,7 +24,7 @@ const CommandDock: React.FC<CommandDockProps> = ({
 }) => {
   return (
     <div className={`${PANEL_STYLES.commandDock} pointer-events-auto`}>
-      <div className="p-3 flex items-center justify-between text-[10px] font-mono">
+      <div className="px-4 py-3.5 flex items-center justify-between text-[10px] font-mono">
         {/* Command Palette Trigger */}
         <button
           onClick={onOpenCommandPalette}

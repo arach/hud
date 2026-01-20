@@ -6,16 +6,17 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "og": "npx @arach/og og-template.html -o public/og.png"
   },
   "dependencies": {
-    "recharts": "^3.6.0",
-    "react-dom": "^19.2.3",
-    "lucide-react": "^0.562.0",
-    "react": "^19.2.3",
     "@google/genai": "^1.37.0",
-    "uuid": "^13.0.0",
-    "prismjs": "1.29.0"
+    "lucide-react": "^0.562.0",
+    "prismjs": "1.29.0",
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3",
+    "recharts": "^3.6.0",
+    "uuid": "^13.0.0"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",
