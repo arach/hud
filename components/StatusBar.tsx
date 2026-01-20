@@ -1,6 +1,14 @@
-import React, { useState, useEffect } from 'react';
-import { Wifi, GitBranch, Activity, Clock, Mic, Terminal, Radio, Map, Maximize2 } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Wifi, GitBranch, Activity, Clock, Mic, Terminal, Radio, Map, Maximize2, ChevronDown, Check } from 'lucide-react';
 import { PANEL_STYLES } from '../lib/hudChrome';
+
+const MOCK_BRANCHES = [
+  { name: 'main', isDefault: true },
+  { name: 'feature/hud-structure', isCurrent: true },
+  { name: 'feature/voice-integration', isRecent: true },
+  { name: 'fix/minimap-rendering', isRecent: true },
+  { name: 'develop' },
+];
 
 interface StatusBarProps {
   panOffset: { x: number; y: number };
@@ -34,6 +42,22 @@ const StatusBar: React.FC<StatusBarProps> = ({
   const [time, setTime] = useState(new Date());
   const [latency, setLatency] = useState(24);
   const [vpCopied, setVpCopied] = useState(false);
+  const [branchMenuOpen, setBranchMenuOpen] = useState(false);
+  const [currentBranch, setCurrentBranch] = useState('feature/hud-structure');
+  const branchMenuRef = useRef<HTMLDivElement>(null);
+
+  // Close branch menu on outside click
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (branchMenuRef.current && !branchMenuRef.current.contains(e.target as Node)) {
+        setBranchMenuOpen(false);
+      }
+    };
+    if (branchMenuOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [branchMenuOpen]);
 
   useEffect(() => {
     const timer = setInterval(() => setTime(new Date()), 1000);
@@ -59,7 +83,7 @@ const StatusBar: React.FC<StatusBarProps> = ({
   };
 
   const handleCopyViewport = async () => {
-    const payload = `CAM X:${viewportCamera.x.toFixed(0)} Y:${viewportCamera.y.toFixed(0)} | SIZE ${viewportSize.w.toFixed(0)}x${viewportSize.h.toFixed(0)}`;
+    const payload = `PAN: ${viewportCamera.x.toFixed(0)},${viewportCamera.y.toFixed(0)} | SIZE: ${viewportSize.w.toFixed(0)}x${viewportSize.h.toFixed(0)} | ZOOM: ${(scale * 100).toFixed(0)}%`;
     try {
       await navigator.clipboard.writeText(payload);
       setVpCopied(true);
@@ -100,10 +124,51 @@ const StatusBar: React.FC<StatusBarProps> = ({
 
         <div className="h-3 w-px bg-neutral-800" />
 
-        <div className="flex items-center gap-1.5 hover:text-neutral-300 transition-colors cursor-pointer">
+        <div className="relative" ref={branchMenuRef}>
+          <button
+            onClick={() => setBranchMenuOpen(!branchMenuOpen)}
+            className="flex items-center gap-1.5 hover:text-neutral-300 transition-colors cursor-pointer"
+          >
             <GitBranch size={10} />
-            <span>main</span>
-            <span className="text-neutral-600">*</span>
+            <span className="max-w-[100px] truncate">{currentBranch}</span>
+            <ChevronDown size={10} className={`transition-transform ${branchMenuOpen ? 'rotate-180' : ''}`} />
+          </button>
+
+          {/* Branch Selector Popup */}
+          {branchMenuOpen && (
+            <div className="absolute bottom-full left-0 mb-2 w-56 bg-black/95 backdrop-blur-xl border border-neutral-800 rounded-lg shadow-xl overflow-hidden z-50 animate-in fade-in slide-in-from-bottom-2 duration-150">
+              <div className="px-3 py-2 border-b border-neutral-800 text-[9px] text-neutral-500 uppercase tracking-widest">
+                Switch Branch
+              </div>
+              <div className="py-1 max-h-48 overflow-y-auto">
+                {MOCK_BRANCHES.map((branch) => (
+                  <button
+                    key={branch.name}
+                    onClick={() => {
+                      setCurrentBranch(branch.name);
+                      setBranchMenuOpen(false);
+                    }}
+                    className={`w-full px-3 py-1.5 flex items-center gap-2 text-left hover:bg-white/5 transition-colors ${
+                      currentBranch === branch.name ? 'bg-white/5' : ''
+                    }`}
+                  >
+                    <div className="w-4 flex justify-center">
+                      {currentBranch === branch.name && <Check size={10} className="text-emerald-500" />}
+                    </div>
+                    <span className={`flex-1 truncate ${currentBranch === branch.name ? 'text-white' : 'text-neutral-400'}`}>
+                      {branch.name}
+                    </span>
+                    {branch.isDefault && (
+                      <span className="text-[8px] px-1.5 py-0.5 rounded bg-neutral-800 text-neutral-500">default</span>
+                    )}
+                    {branch.isRecent && !branch.isCurrent && (
+                      <span className="text-[8px] text-neutral-600">recent</span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="h-3 w-px bg-neutral-800" />
@@ -115,30 +180,30 @@ const StatusBar: React.FC<StatusBarProps> = ({
       </div>
 
       {/* CENTER: Viewport Data (Hidden on mobile or when controls need space) */}
-      <div className={`absolute left-1/2 -translate-x-1/2 flex items-center gap-4 hidden md:flex opacity-70 hover:opacity-100 transition-opacity ${isCompact ? 'opacity-30' : ''}`}>
-         <div className="flex items-center gap-1">
-             <span className="text-neutral-600">CX:</span>
-             <span className="tabular-nums w-8 text-right">{viewportCamera.x.toFixed(0)}</span>
-         </div>
-         <div className="flex items-center gap-1">
-             <span className="text-neutral-600">CY:</span>
-             <span className="tabular-nums w-8 text-right">{viewportCamera.y.toFixed(0)}</span>
-         </div>
-         <div className="h-3 w-px bg-neutral-800" />
-         <div className="flex items-center gap-1">
-             <span className="text-neutral-600">ZM:</span>
-             <span className="tabular-nums">{(scale * 100).toFixed(0)}%</span>
-         </div>
-         <div className="h-3 w-px bg-neutral-800" />
+      <div className={`absolute left-1/2 -translate-x-1/2 flex items-center gap-3 hidden md:flex opacity-70 hover:opacity-100 transition-opacity ${isCompact ? 'opacity-30' : ''}`}>
          <button
              onClick={handleCopyViewport}
-             className="flex items-center gap-2 hover:text-neutral-200 transition-colors cursor-pointer"
-             title="Copy camera and viewport size"
+             className="flex items-center gap-3 hover:text-neutral-200 transition-colors cursor-pointer"
+             title="Copy viewport data"
          >
-             <span className="text-neutral-600">VP:</span>
-             <span className={`tabular-nums ${vpCopied ? 'text-emerald-500' : ''}`}>
-               CAM X:{viewportCamera.x.toFixed(0)} Y:{viewportCamera.y.toFixed(0)} | SIZE {viewportSize.w.toFixed(0)}x{viewportSize.h.toFixed(0)}
-             </span>
+             <div className="flex items-center gap-1">
+                 <span className="text-neutral-600">PAN:</span>
+                 <span className={`tabular-nums ${vpCopied ? 'text-emerald-500' : ''}`}>
+                   {viewportCamera.x.toFixed(0)},{viewportCamera.y.toFixed(0)}
+                 </span>
+             </div>
+             <div className="h-3 w-px bg-neutral-800" />
+             <div className="flex items-center gap-1">
+                 <span className="text-neutral-600">SIZE:</span>
+                 <span className={`tabular-nums ${vpCopied ? 'text-emerald-500' : ''}`}>
+                   {viewportSize.w.toFixed(0)}x{viewportSize.h.toFixed(0)}
+                 </span>
+             </div>
+             <div className="h-3 w-px bg-neutral-800" />
+             <div className="flex items-center gap-1">
+                 <span className="text-neutral-600">ZOOM:</span>
+                 <span className={`tabular-nums ${vpCopied ? 'text-emerald-500' : ''}`}>{(scale * 100).toFixed(0)}%</span>
+             </div>
          </button>
       </div>
 

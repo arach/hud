@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef, lazy, Suspense } from 'react';
 import HUDFrame from './components/HUDFrame';
 import type { CanvasDebugState } from './components/Canvas';
 import ChatInterface from './components/ChatInterface';
@@ -8,16 +8,18 @@ import StatusBar from './components/StatusBar';
 import VoiceLog from './components/VoiceLog';
 import DraggableWindow from './components/DraggableWindow';
 import TerminalDrawer from './components/TerminalDrawer';
-import DbSchema from './components/tools/DbSchema';
-import ArchDiagram from './components/tools/ArchDiagram';
-import CodeEditor from './components/tools/CodeEditor';
-import GitGraph from './components/tools/GitGraph';
-import DocsEditor from './components/tools/DocsEditor';
-import UiPreview from './components/tools/UiPreview';
-import PipelineMonitor from './components/tools/PipelineMonitor';
-import DiffViewer from './components/tools/DiffViewer';
-import LogViewer from './components/tools/LogViewer';
-import SystemMonitor from './components/SystemMonitor';
+
+// Lazy-loaded tool components for code splitting
+const DbSchema = lazy(() => import('./components/tools/DbSchema'));
+const ArchDiagram = lazy(() => import('./components/tools/ArchDiagram'));
+const CodeEditor = lazy(() => import('./components/tools/CodeEditor'));
+const GitGraph = lazy(() => import('./components/tools/GitGraph'));
+const DocsEditor = lazy(() => import('./components/tools/DocsEditor'));
+const UiPreview = lazy(() => import('./components/tools/UiPreview'));
+const PipelineMonitor = lazy(() => import('./components/tools/PipelineMonitor'));
+const DiffViewer = lazy(() => import('./components/tools/DiffViewer'));
+const LogViewer = lazy(() => import('./components/tools/LogViewer'));
+const SystemMonitor = lazy(() => import('./components/SystemMonitor'));
 import CommandPalette, { CommandOption } from './components/CommandPalette';
 import { ContextDef } from './components/ContextBar';
 import { ViewMode } from './components/ContextDock';
@@ -27,6 +29,7 @@ import ContextZone from './components/ContextZone';
 import SectorLocator from './components/SectorLocator';
 import InspectorPanel from './components/InspectorPanel';
 import CommandDock from './components/CommandDock';
+import ZoomControls from './components/ZoomControls';
 import { useHud } from './contexts/HudContext';
 import { INITIAL_SYSTEM_INSTRUCTION, HUD_TOOLS } from './constants';
 import { useLiveSession } from './hooks/useLiveSession';
@@ -41,7 +44,8 @@ import {
   LayoutGrid,
   Power,
   Mic,
-  PanelLeft
+  PanelLeft,
+  PanelRight
 } from 'lucide-react';
 
 const App: React.FC = () => {
@@ -55,6 +59,7 @@ const App: React.FC = () => {
   const [isLogDockOpen, setIsLogDockOpen] = useState(false);
   const [isMinimapCollapsed, setIsMinimapCollapsed] = useState(false);
   const [isManifestCollapsed, setIsManifestCollapsed] = useState(false);
+  const [isInspectorCollapsed, setIsInspectorCollapsed] = useState(false);
   const [selectedWindowId, setSelectedWindowId] = useState<string | null>(null);
   const [selectedContextId, setSelectedContextId] = useState<string | null>(null);
   const [selectedFilter, setSelectedFilter] = useState<{ kind: 'view'; id: ViewMode } | null>(null);
@@ -534,19 +539,25 @@ CURRENT HUD ENVIRONMENT:
       sendMessage(text, scope);
   };
 
+  const ToolLoader = () => (
+    <div className="flex items-center justify-center h-full">
+      <div className="text-neutral-500 text-xs font-mono animate-pulse">Loading module...</div>
+    </div>
+  );
+
   const renderWindowContent = (id: string) => {
     switch(id) {
         case 'tasks': return <TaskManager tasks={tasks} onComplete={completeTask} />;
-        case 'code': return <CodeEditor />;
-        case 'db': return <DbSchema />;
-        case 'arch': return <ArchDiagram />;
-        case 'git': return <GitGraph />;
-        case 'pipeline': return <PipelineMonitor />;
-        case 'diff': return <DiffViewer />;
-        case 'logs': return <LogViewer />;
-        case 'process': return <SystemMonitor />;
-        case 'docs': return <DocsEditor />;
-        case 'ui': return <UiPreview />;
+        case 'code': return <Suspense fallback={<ToolLoader />}><CodeEditor /></Suspense>;
+        case 'db': return <Suspense fallback={<ToolLoader />}><DbSchema /></Suspense>;
+        case 'arch': return <Suspense fallback={<ToolLoader />}><ArchDiagram /></Suspense>;
+        case 'git': return <Suspense fallback={<ToolLoader />}><GitGraph /></Suspense>;
+        case 'pipeline': return <Suspense fallback={<ToolLoader />}><PipelineMonitor /></Suspense>;
+        case 'diff': return <Suspense fallback={<ToolLoader />}><DiffViewer /></Suspense>;
+        case 'logs': return <Suspense fallback={<ToolLoader />}><LogViewer /></Suspense>;
+        case 'process': return <Suspense fallback={<ToolLoader />}><SystemMonitor /></Suspense>;
+        case 'docs': return <Suspense fallback={<ToolLoader />}><DocsEditor /></Suspense>;
+        case 'ui': return <Suspense fallback={<ToolLoader />}><UiPreview /></Suspense>;
         default: return <div className="p-4 text-neutral-500">Module Loading...</div>;
     }
   };
@@ -644,6 +655,7 @@ CURRENT HUD ENVIRONMENT:
                   onToggleCollapse={() => setIsManifestCollapsed(prev => !prev)}
                   viewport={viewport}
                   onNavigate={handleNavigate}
+                  onViewAll={() => focusContext('global')}
               />
             )}
 
@@ -658,20 +670,35 @@ CURRENT HUD ENVIRONMENT:
               </button>
             )}
 
-            <InspectorPanel
-                windows={windows}
-                selectedWindowId={selectedWindowId}
-                selectedContextId={selectedContextId}
-                selectedFilter={selectedFilter}
-                namespaceQuery={namespaceQuery}
-                activeView={activeView}
-                activeContextId={activeContextId}
-                contexts={contexts}
-                contextSizes={contextSizes}
-                canvasDebug={canvasDebug}
-                panOffset={panOffset}
-                scale={scale}
-            />
+            {!isInspectorCollapsed && (
+              <InspectorPanel
+                  windows={windows}
+                  selectedWindowId={selectedWindowId}
+                  selectedContextId={selectedContextId}
+                  selectedFilter={selectedFilter}
+                  namespaceQuery={namespaceQuery}
+                  activeView={activeView}
+                  activeContextId={activeContextId}
+                  contexts={contexts}
+                  contextSizes={contextSizes}
+                  canvasDebug={canvasDebug}
+                  panOffset={panOffset}
+                  scale={scale}
+                  isCollapsed={isInspectorCollapsed}
+                  onToggleCollapse={() => setIsInspectorCollapsed(prev => !prev)}
+              />
+            )}
+
+            {/* Collapsed Inspector Toggle */}
+            {isInspectorCollapsed && (
+              <button
+                onClick={() => setIsInspectorCollapsed(false)}
+                className="fixed top-[56px] right-2 z-40 p-2 bg-black/90 backdrop-blur-xl border border-neutral-800 rounded-lg hover:bg-white/10 transition-colors pointer-events-auto"
+                title="Expand inspector"
+              >
+                <PanelRight size={16} className="text-neutral-400" />
+              </button>
+            )}
             
             {/* Enhanced Sector Locator */}
             {activeView === 'spatial' && scopedWindows.length > 0 && (
@@ -691,12 +718,15 @@ CURRENT HUD ENVIRONMENT:
                   </div>
             </div>
 
+            {/* Zoom Controls - floating on canvas bottom-right */}
+            <ZoomControls
+              scale={scale}
+              onZoomIn={() => setScale(s => Math.min(3, s + 0.2))}
+              onZoomOut={() => setScale(s => Math.max(0.2, s - 0.2))}
+            />
+
             {!isCompactMode && (
               <CommandDock
-                  scale={scale}
-                  onZoomIn={() => setScale(s => Math.min(3, s + 0.2))}
-                  onZoomOut={() => setScale(s => Math.max(0.2, s - 0.2))}
-                  onResetLayout={handleAutoLayout}
                   onOpenCommandPalette={() => setIsCmdPaletteOpen(true)}
                   onToggleVoice={toggleVoice}
                   onToggleTerminal={() => setIsTerminalOpen(p => !p)}

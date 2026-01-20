@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      width: 1200px;
+      height: 630px;
+      background: #09090b;
+      font-family: 'Inter', system-ui, sans-serif;
+      color: #f0f4f7;
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* Subtle glow */
+    .glow {
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(circle at 15% 85%, rgba(16, 185, 129, 0.08), transparent 40%),
+        radial-gradient(circle at 85% 15%, rgba(59, 130, 246, 0.06), transparent 40%);
+      pointer-events: none;
+    }
+
+    /* Dot grid */
+    .grid {
+      position: absolute;
+      inset: 0;
+      background-image: radial-gradient(circle, rgba(255,255,255,0.08) 1px, transparent 1px);
+      background-size: 20px 20px;
+      opacity: 0.5;
+    }
+
+    /* Navigation bar at top */
+    .nav {
+      position: absolute;
+      top: 24px;
+      left: 24px;
+      right: 24px;
+      height: 36px;
+      background: rgba(0,0,0,0.6);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      padding: 0 12px;
+      gap: 8px;
+    }
+    .nav-item {
+      height: 8px;
+      background: rgba(255,255,255,0.15);
+      border-radius: 2px;
+    }
+    .nav-item.active {
+      background: rgba(16, 185, 129, 0.5);
+    }
+    .nav-spacer {
+      flex: 1;
+    }
+    .nav-search {
+      width: 120px;
+      height: 20px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 4px;
+    }
+
+    /* Manifest panel on left */
+    .manifest {
+      position: absolute;
+      top: 72px;
+      left: 24px;
+      bottom: 56px;
+      width: 140px;
+      background: rgba(0,0,0,0.5);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 6px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .manifest-header {
+      height: 6px;
+      width: 50px;
+      background: rgba(255,255,255,0.2);
+      border-radius: 2px;
+      margin-bottom: 4px;
+    }
+    .manifest-item {
+      height: 24px;
+      background: rgba(255,255,255,0.04);
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      padding: 0 8px;
+      gap: 6px;
+    }
+    .manifest-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: rgba(16, 185, 129, 0.6);
+    }
+    .manifest-dot.blue { background: rgba(59, 130, 246, 0.6); }
+    .manifest-dot.amber { background: rgba(245, 158, 11, 0.6); }
+    .manifest-dot.purple { background: rgba(168, 85, 247, 0.6); }
+    .manifest-line {
+      flex: 1;
+      height: 4px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 1px;
+    }
+    .manifest-spacer {
+      flex: 1;
+    }
+    .manifest-minimap {
+      height: 60px;
+      background: rgba(0,0,0,0.4);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 4px;
+      position: relative;
+      overflow: hidden;
+    }
+    .minimap-viewport {
+      position: absolute;
+      top: 15px;
+      left: 20px;
+      width: 40px;
+      height: 25px;
+      border: 1px solid rgba(16, 185, 129, 0.4);
+      border-radius: 2px;
+    }
+    .minimap-dot {
+      position: absolute;
+      width: 4px;
+      height: 4px;
+      background: rgba(255,255,255,0.2);
+      border-radius: 1px;
+    }
+
+    /* Inspector panel on right */
+    .inspector {
+      position: absolute;
+      top: 72px;
+      right: 24px;
+      bottom: 56px;
+      width: 140px;
+      background: rgba(0,0,0,0.5);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 6px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .inspector-header {
+      height: 6px;
+      width: 60px;
+      background: rgba(255,255,255,0.2);
+      border-radius: 2px;
+      margin-bottom: 6px;
+    }
+    .inspector-section {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      margin-bottom: 8px;
+    }
+    .inspector-label {
+      height: 4px;
+      width: 30px;
+      background: rgba(255,255,255,0.15);
+      border-radius: 1px;
+    }
+    .inspector-value {
+      height: 4px;
+      width: 80px;
+      background: rgba(255,255,255,0.08);
+      border-radius: 1px;
+    }
+    .inspector-value.short { width: 50px; }
+
+    /* Status bar at bottom */
+    .status {
+      position: absolute;
+      bottom: 24px;
+      left: 24px;
+      right: 24px;
+      height: 24px;
+      background: rgba(0,0,0,0.7);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      padding: 0 12px;
+      gap: 16px;
+    }
+    .status-item {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .status-label {
+      height: 4px;
+      width: 20px;
+      background: rgba(255,255,255,0.12);
+      border-radius: 1px;
+    }
+    .status-value {
+      height: 4px;
+      width: 30px;
+      background: rgba(255,255,255,0.06);
+      border-radius: 1px;
+    }
+    .status-spacer { flex: 1; }
+    .status-branch {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .status-branch-icon {
+      width: 8px;
+      height: 8px;
+      border: 1px solid rgba(16, 185, 129, 0.5);
+      border-radius: 50%;
+    }
+    .status-branch-name {
+      height: 4px;
+      width: 50px;
+      background: rgba(16, 185, 129, 0.3);
+      border-radius: 1px;
+    }
+
+    /* Canvas area - windows */
+    .canvas {
+      position: absolute;
+      top: 72px;
+      left: 176px;
+      right: 176px;
+      bottom: 56px;
+    }
+    .window {
+      position: absolute;
+      background: rgba(0,0,0,0.6);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 6px;
+      overflow: hidden;
+    }
+    .window-header {
+      height: 20px;
+      background: rgba(255,255,255,0.03);
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+      display: flex;
+      align-items: center;
+      padding: 0 8px;
+      gap: 4px;
+    }
+    .window-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.15);
+    }
+    .window-title {
+      margin-left: 6px;
+      height: 4px;
+      width: 40px;
+      background: rgba(255,255,255,0.12);
+      border-radius: 1px;
+    }
+    .window-content {
+      padding: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .window-line {
+      height: 3px;
+      background: rgba(255,255,255,0.06);
+      border-radius: 1px;
+    }
+
+    /* Branding */
+    .brand {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      text-align: center;
+      z-index: 10;
+    }
+    .brand-name {
+      font-size: 56px;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      color: #fff;
+      text-shadow: 0 0 60px rgba(16, 185, 129, 0.3);
+    }
+    .brand-tagline {
+      margin-top: 8px;
+      font-size: 14px;
+      color: rgba(255,255,255,0.5);
+      letter-spacing: 0.05em;
+    }
+  </style>
+</head>
+<body>
+  <div class="glow"></div>
+  <div class="grid"></div>
+
+  <!-- Navigation -->
+  <div class="nav">
+    <div class="nav-item active" style="width: 40px;"></div>
+    <div class="nav-item" style="width: 30px;"></div>
+    <div class="nav-item" style="width: 35px;"></div>
+    <div class="nav-item" style="width: 28px;"></div>
+    <div class="nav-spacer"></div>
+    <div class="nav-search"></div>
+  </div>
+
+  <!-- Manifest -->
+  <div class="manifest">
+    <div class="manifest-header"></div>
+    <div class="manifest-item">
+      <div class="manifest-dot"></div>
+      <div class="manifest-line"></div>
+    </div>
+    <div class="manifest-item">
+      <div class="manifest-dot blue"></div>
+      <div class="manifest-line" style="width: 70%;"></div>
+    </div>
+    <div class="manifest-item">
+      <div class="manifest-dot amber"></div>
+      <div class="manifest-line" style="width: 85%;"></div>
+    </div>
+    <div class="manifest-item">
+      <div class="manifest-dot purple"></div>
+      <div class="manifest-line" style="width: 60%;"></div>
+    </div>
+    <div class="manifest-spacer"></div>
+    <div class="manifest-minimap">
+      <div class="minimap-viewport"></div>
+      <div class="minimap-dot" style="top: 10px; left: 60px;"></div>
+      <div class="minimap-dot" style="top: 35px; left: 80px;"></div>
+      <div class="minimap-dot" style="top: 45px; left: 30px;"></div>
+    </div>
+  </div>
+
+  <!-- Inspector -->
+  <div class="inspector">
+    <div class="inspector-header"></div>
+    <div class="inspector-section">
+      <div class="inspector-label"></div>
+      <div class="inspector-value"></div>
+      <div class="inspector-value short"></div>
+    </div>
+    <div class="inspector-section">
+      <div class="inspector-label"></div>
+      <div class="inspector-value" style="width: 70px;"></div>
+      <div class="inspector-value" style="width: 60px;"></div>
+      <div class="inspector-value short"></div>
+    </div>
+    <div class="inspector-section">
+      <div class="inspector-label"></div>
+      <div class="inspector-value" style="width: 90px;"></div>
+    </div>
+  </div>
+
+  <!-- Status Bar -->
+  <div class="status">
+    <div class="status-item">
+      <div class="status-label"></div>
+      <div class="status-value"></div>
+    </div>
+    <div class="status-item">
+      <div class="status-label"></div>
+      <div class="status-value"></div>
+    </div>
+    <div class="status-item">
+      <div class="status-label"></div>
+      <div class="status-value" style="width: 20px;"></div>
+    </div>
+    <div class="status-spacer"></div>
+    <div class="status-branch">
+      <div class="status-branch-icon"></div>
+      <div class="status-branch-name"></div>
+    </div>
+  </div>
+
+  <!-- Canvas with windows -->
+  <div class="canvas">
+    <div class="window" style="top: 30px; left: 60px; width: 200px; height: 120px;">
+      <div class="window-header">
+        <div class="window-dot"></div>
+        <div class="window-dot"></div>
+        <div class="window-dot"></div>
+        <div class="window-title"></div>
+      </div>
+      <div class="window-content">
+        <div class="window-line" style="width: 90%;"></div>
+        <div class="window-line" style="width: 70%;"></div>
+        <div class="window-line" style="width: 80%;"></div>
+        <div class="window-line" style="width: 60%;"></div>
+      </div>
+    </div>
+
+    <div class="window" style="top: 100px; left: 300px; width: 180px; height: 100px;">
+      <div class="window-header">
+        <div class="window-dot"></div>
+        <div class="window-dot"></div>
+        <div class="window-dot"></div>
+        <div class="window-title" style="width: 50px;"></div>
+      </div>
+      <div class="window-content">
+        <div class="window-line" style="width: 85%;"></div>
+        <div class="window-line" style="width: 65%;"></div>
+        <div class="window-line" style="width: 75%;"></div>
+      </div>
+    </div>
+
+    <div class="window" style="top: 180px; left: 140px; width: 160px; height: 90px;">
+      <div class="window-header">
+        <div class="window-dot"></div>
+        <div class="window-dot"></div>
+        <div class="window-dot"></div>
+        <div class="window-title" style="width: 35px;"></div>
+      </div>
+      <div class="window-content">
+        <div class="window-line" style="width: 75%;"></div>
+        <div class="window-line" style="width: 90%;"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Brand overlay -->
+  <div class="brand">
+    <div class="brand-name">HUD</div>
+    <div class="brand-tagline">SPATIAL CANVAS FOR DEVELOPERS</div>
+  </div>
+</body>
+</html>

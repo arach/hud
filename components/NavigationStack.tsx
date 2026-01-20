@@ -81,34 +81,31 @@ const NavigationStack: React.FC<NavigationStackProps> = ({
           </div>
         </div>
 
-        {/* RIGHT: Scope Filter */}
-        <div className="flex items-center gap-3 shrink-0">
-          <div className="flex items-center gap-2">
-            <span className="text-[9px] font-bold tracking-widest text-neutral-500 uppercase whitespace-nowrap">Scope Filter</span>
-            <div className="relative">
-              <Search size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500" />
-              <input
-                type="text"
-                value={namespaceQuery}
-                onChange={(e) => onNamespaceQueryChange(e.target.value)}
-                placeholder="**"
-                className={`
-                  w-[200px] h-8 pl-8 pr-8 bg-white/5 border rounded-lg text-[11px] font-mono
-                  placeholder:text-neutral-600 text-neutral-300
-                  focus:outline-none focus:ring-1 focus:ring-white/20 focus:bg-white/10
-                  transition-all duration-200
-                  ${isFiltered ? 'border-emerald-700/50 bg-emerald-950/20' : 'border-neutral-700/50'}
-                `}
-              />
-              {isFiltered && (
-                <button
-                  onClick={() => onNamespaceQueryChange('**')}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-white transition-colors"
-                >
-                  <X size={12} />
-                </button>
-              )}
-            </div>
+        {/* RIGHT: Scope Filter - matches Inspector panel width */}
+        <div className="absolute right-0 top-0 bottom-0 w-[280px] flex items-center px-4">
+          <div className="relative flex-1">
+            <Search size={12} className="absolute left-0 top-1/2 -translate-y-1/2 text-neutral-500" />
+            <input
+              type="text"
+              value={namespaceQuery}
+              onChange={(e) => onNamespaceQueryChange(e.target.value)}
+              placeholder="Scope filter..."
+              className={`
+                w-full h-8 pl-5 pr-8 bg-transparent text-[11px] font-mono
+                placeholder:text-neutral-600 text-neutral-300
+                focus:outline-none
+                transition-all duration-200
+                ${isFiltered ? 'text-emerald-400' : ''}
+              `}
+            />
+            {isFiltered && (
+              <button
+                onClick={() => onNamespaceQueryChange('**')}
+                className="absolute right-0 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-white transition-colors"
+              >
+                <X size={12} />
+              </button>
+            )}
           </div>
         </div>
       </div>
