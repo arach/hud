@@ -40,8 +40,8 @@ export const PANEL_STYLES = {
   // Status bar at bottom - edge-to-edge
   statusBar: `bg-[#09090b]/95 backdrop-blur-xl border-t border-neutral-800 shadow-[0_-5px_30px_rgba(0,0,0,0.6),inset_0_1px_0_rgba(255,255,255,0.03)] fixed bottom-0 left-0 right-0 z-[60]`,
 
-  // Command dock at bottom-right
-  commandDock: `bg-black/90 backdrop-blur-xl border border-neutral-800/80 shadow-[0_0_20px_rgba(0,0,0,0.7)] fixed right-0 bottom-[28px] z-[45] rounded-none border-r-0 border-b-0 overflow-hidden`,
+  // Command dock at bottom-right - matches inspector width
+  commandDock: `bg-black/90 backdrop-blur-xl border-t border-l border-neutral-800/80 fixed right-0 bottom-[28px] w-[280px] z-[45] rounded-none overflow-hidden`,
 } as const;
 
 // Edge fade effects for panels that border the canvas

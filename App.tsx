@@ -29,6 +29,7 @@ import ContextZone from './components/ContextZone';
 import SectorLocator from './components/SectorLocator';
 import InspectorPanel from './components/InspectorPanel';
 import CommandDock from './components/CommandDock';
+import ZoomControls from './components/ZoomControls';
 import { useHud } from './contexts/HudContext';
 import { INITIAL_SYSTEM_INSTRUCTION, HUD_TOOLS } from './constants';
 import { useLiveSession } from './hooks/useLiveSession';
@@ -43,7 +44,8 @@ import {
   LayoutGrid,
   Power,
   Mic,
-  PanelLeft
+  PanelLeft,
+  PanelRight
 } from 'lucide-react';
 
 const App: React.FC = () => {
@@ -57,6 +59,7 @@ const App: React.FC = () => {
   const [isLogDockOpen, setIsLogDockOpen] = useState(false);
   const [isMinimapCollapsed, setIsMinimapCollapsed] = useState(false);
   const [isManifestCollapsed, setIsManifestCollapsed] = useState(false);
+  const [isInspectorCollapsed, setIsInspectorCollapsed] = useState(false);
   const [selectedWindowId, setSelectedWindowId] = useState<string | null>(null);
   const [selectedContextId, setSelectedContextId] = useState<string | null>(null);
   const [selectedFilter, setSelectedFilter] = useState<{ kind: 'view'; id: ViewMode } | null>(null);
@@ -667,20 +670,35 @@ CURRENT HUD ENVIRONMENT:
               </button>
             )}
 
-            <InspectorPanel
-                windows={windows}
-                selectedWindowId={selectedWindowId}
-                selectedContextId={selectedContextId}
-                selectedFilter={selectedFilter}
-                namespaceQuery={namespaceQuery}
-                activeView={activeView}
-                activeContextId={activeContextId}
-                contexts={contexts}
-                contextSizes={contextSizes}
-                canvasDebug={canvasDebug}
-                panOffset={panOffset}
-                scale={scale}
-            />
+            {!isInspectorCollapsed && (
+              <InspectorPanel
+                  windows={windows}
+                  selectedWindowId={selectedWindowId}
+                  selectedContextId={selectedContextId}
+                  selectedFilter={selectedFilter}
+                  namespaceQuery={namespaceQuery}
+                  activeView={activeView}
+                  activeContextId={activeContextId}
+                  contexts={contexts}
+                  contextSizes={contextSizes}
+                  canvasDebug={canvasDebug}
+                  panOffset={panOffset}
+                  scale={scale}
+                  isCollapsed={isInspectorCollapsed}
+                  onToggleCollapse={() => setIsInspectorCollapsed(prev => !prev)}
+              />
+            )}
+
+            {/* Collapsed Inspector Toggle */}
+            {isInspectorCollapsed && (
+              <button
+                onClick={() => setIsInspectorCollapsed(false)}
+                className="fixed top-[56px] right-2 z-40 p-2 bg-black/90 backdrop-blur-xl border border-neutral-800 rounded-lg hover:bg-white/10 transition-colors pointer-events-auto"
+                title="Expand inspector"
+              >
+                <PanelRight size={16} className="text-neutral-400" />
+              </button>
+            )}
             
             {/* Enhanced Sector Locator */}
             {activeView === 'spatial' && scopedWindows.length > 0 && (
@@ -700,12 +718,15 @@ CURRENT HUD ENVIRONMENT:
                   </div>
             </div>
 
+            {/* Zoom Controls - Map style, bottom right */}
+            <ZoomControls
+              scale={scale}
+              onZoomIn={() => setScale(s => Math.min(3, s + 0.2))}
+              onZoomOut={() => setScale(s => Math.max(0.2, s - 0.2))}
+            />
+
             {!isCompactMode && (
               <CommandDock
-                  scale={scale}
-                  onZoomIn={() => setScale(s => Math.min(3, s + 0.2))}
-                  onZoomOut={() => setScale(s => Math.max(0.2, s - 0.2))}
-                  onResetLayout={handleAutoLayout}
                   onOpenCommandPalette={() => setIsCmdPaletteOpen(true)}
                   onToggleVoice={toggleVoice}
                   onToggleTerminal={() => setIsTerminalOpen(p => !p)}

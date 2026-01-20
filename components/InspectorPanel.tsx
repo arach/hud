@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { WindowState } from '../types';
 import { ContextDef } from './ContextBar';
 import type { CanvasDebugState } from './Canvas';
-import { Check, Copy } from 'lucide-react';
+import { Check, Copy, PanelRightClose } from 'lucide-react';
 import { PANEL_STYLES } from '../lib/hudChrome';
 
 interface InspectorPanelProps {
@@ -18,6 +18,8 @@ interface InspectorPanelProps {
   canvasDebug?: CanvasDebugState | null;
   panOffset?: { x: number; y: number };
   scale?: number;
+  isCollapsed?: boolean;
+  onToggleCollapse?: () => void;
 }
 
 const InspectorPanel: React.FC<InspectorPanelProps> = ({
@@ -32,7 +34,9 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({
   contextSizes,
   canvasDebug,
   panOffset,
-  scale
+  scale,
+  isCollapsed = false,
+  onToggleCollapse
 }) => {
   const [copied, setCopied] = useState(false);
 
@@ -153,7 +157,15 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({
                 {copied ? <Check size={10} className="text-emerald-500" /> : <Copy size={10} />}
                 {copied ? 'COPIED' : 'COPY'}
               </button>
-              <span className="text-[9px] text-neutral-600">META</span>
+              {onToggleCollapse && (
+                <button
+                  onClick={onToggleCollapse}
+                  className="p-1 hover:bg-white/10 rounded transition-colors text-neutral-500 hover:text-white"
+                  title="Collapse panel"
+                >
+                  <PanelRightClose size={12} />
+                </button>
+              )}
             </div>
           </div>
         </div>
