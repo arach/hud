@@ -15,14 +15,15 @@ interface HUDFrameProps {
   filterActive?: boolean;
   onCanvasDebug?: (state: CanvasDebugState) => void;
   onViewportChange?: (size: { width: number; height: number }) => void;
+  onCanvasClick?: (e: React.MouseEvent) => void; // Click handler for overview mode
 }
 
-const HUDFrame: React.FC<HUDFrameProps> = ({ 
-  children, 
-  hud, 
-  panOffset, 
-  scale, 
-  onPan, 
+const HUDFrame: React.FC<HUDFrameProps> = ({
+  children,
+  hud,
+  panOffset,
+  scale,
+  onPan,
   onZoom,
   onPanStart,
   onPanEnd,
@@ -30,7 +31,8 @@ const HUDFrame: React.FC<HUDFrameProps> = ({
   activeContextId = 'global',
   filterActive = false,
   onCanvasDebug,
-  onViewportChange
+  onViewportChange,
+  onCanvasClick
 }) => {
   const frameRef = useRef<HTMLDivElement>(null);
   
@@ -93,6 +95,7 @@ const HUDFrame: React.FC<HUDFrameProps> = ({
         scale={scale}
         isPanLocked={isTransitioning}
         onDebug={onCanvasDebug}
+        onClick={onCanvasClick}
       />
       
       {/* Background Depth/Blur Layer for Scopes */}

@@ -28,7 +28,23 @@ export enum Tab {
   SYSTEM = 'SYSTEM'
 }
 
-export type WindowType = 'editor' | 'terminal' | 'visual' | 'system';
+export type WindowType =
+  | 'editor'
+  | 'terminal'
+  | 'visual'
+  | 'system'
+  | 'code'
+  | 'docs'
+  | 'db'
+  | 'arch'
+  | 'git'
+  | 'pipeline'
+  | 'logs'
+  | 'ui'
+  | 'tasks'
+  | 'chat'
+  | 'dither'
+  | 'textlab';
 
 export interface WindowState {
   id: string;

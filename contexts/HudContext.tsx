@@ -1,8 +1,9 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { Message, Task, WindowState, AiThread, WindowType } from '../types';
 import { MOCK_TASKS, INITIAL_SYSTEM_INSTRUCTION } from '../constants';
 import { geminiService } from '../services/geminiService';
 import { useAuth } from './AuthContext';
+import { usePersistentState } from '../lib/hud-core/hooks/usePersistentState';
 import { 
   Code2, 
   PenTool, 
@@ -10,80 +11,105 @@ import {
   Monitor,
   Globe
 } from 'lucide-react';
-import { ContextDef } from '../components/ContextBar';
-import { ViewMode } from '../components/ContextDock';
+import { ContextDef, type ViewMode } from '../components/chrome';
 import { matchesNamespace, deriveContextIdFromQuery, normalizeNamespaceQuery, DEFAULT_NAMESPACE_QUERY } from '../lib/namespace';
 
-// --- LAYOUT SYSTEM CONSTANTS ---
-// We define a coordinate system where contexts are spaced out generously.
-// Origins for each context:
-const ORIGIN_DEV = { x: 0, y: 0 };
-const ORIGIN_DESIGN = { x: 1800, y: 0 };
-const ORIGIN_OPS = { x: 0, y: 1200 };
-const ORIGIN_STUDIO = { x: 1800, y: 1200 };
+// --- CONSTANTS ---
 
-// Helper to offset windows relative to their context origin
-// This makes "Tiling" easy to reason about.
+const WORKSPACE_ORIGINS = {
+  dev: { x: 0, y: 0 },
+  design: { x: 1800, y: 0 },
+  ops: { x: 0, y: 1200 },
+  studio: { x: 1800, y: 1200 },
+} as const;
+
+const GRID_LAYOUT = {
+  gap: 40,
+  width: 700,
+  height: 500,
+} as const;
+
+// --- HELPER FUNCTIONS ---
+
 const layout = (origin: {x: number, y: number}, x: number, y: number, w: number, h: number) => ({
-    x: origin.x + x,
-    y: origin.y + y,
-    w,
-    h
+  x: origin.x + x,
+  y: origin.y + y,
+  w,
+  h
 });
 
 const buildNamespace = (contextId: string, type: WindowType, id: string, groups: string[] = []) => {
   return ['hud', contextId, type, ...groups, id].join('.');
 };
 
+const generateId = (prefix = ''): string => {
+  const timestamp = Date.now().toString(36);
+  const random = Math.random().toString(36).substring(2, 9);
+  return prefix ? `${prefix}-${timestamp}-${random}` : `${timestamp}-${random}`;
+};
+
+// Helper function for type matching (extracted to avoid duplication)
+const matchesViewType = (windowType: WindowType, viewMode: ViewMode): boolean => {
+  if (viewMode === 'spatial') return true;
+  if (viewMode === 'terminals') return windowType === 'terminal';
+  if (viewMode === 'editors') return windowType === 'editor';
+  if (viewMode === 'visuals') return windowType === 'visual';
+  return false;
+};
+
+// --- CONTENT DEFINITION ---
+// This is where the actual CONTENT (tool instances/windows) is defined.
+// See CONTENT_LOCATION.md for detailed explanation of content management.
+//
+// DEFAULT_WINDOWS: Initial/default content instances
+// windows state: Current/live content instances (managed via React state)
+// Content is NOT persisted (unlike tasks/messages)
+
 export const CONTEXTS: ContextDef[] = [
   { id: 'global', label: 'GLOBAL NETWORK', x: 0, y: 0, color: '#ec4899', icon: <Globe size={18} /> }, 
-  { id: 'dev', label: 'DEV CORE', ...ORIGIN_DEV, color: '#10b981', icon: <Code2 size={18} /> },
-  { id: 'design', label: 'BLUEPRINTS', ...ORIGIN_DESIGN, color: '#3b82f6', icon: <PenTool size={18} /> },
-  { id: 'ops', label: 'SYSTEM OPS', ...ORIGIN_OPS, color: '#f59e0b', icon: <Server size={18} /> },
-  { id: 'studio', label: 'VISUAL STUDIO', ...ORIGIN_STUDIO, color: '#8b5cf6', icon: <Monitor size={18} /> },
+  { id: 'dev', label: 'DEV CORE', ...WORKSPACE_ORIGINS.dev, color: '#10b981', icon: <Code2 size={18} /> },
+  { id: 'design', label: 'BLUEPRINTS', ...WORKSPACE_ORIGINS.design, color: '#3b82f6', icon: <PenTool size={18} /> },
+  { id: 'ops', label: 'SYSTEM OPS', ...WORKSPACE_ORIGINS.ops, color: '#f59e0b', icon: <Server size={18} /> },
+  { id: 'studio', label: 'VISUAL STUDIO', ...WORKSPACE_ORIGINS.studio, color: '#8b5cf6', icon: <Monitor size={18} /> },
 ];
 
 const DEFAULT_WINDOWS: WindowState[] = [
-    // --- DEV CORE (Bento Grid) ---
-    // Main Code Editor takes left side
-    { id: 'code', contextId: 'dev', namespace: buildNamespace('dev', 'editor', 'code'), type: 'editor', title: 'Code Editor', ...layout(ORIGIN_DEV, 0, 0, 800, 620), zIndex: 10 },
-    // Docs top right
-    { id: 'docs', contextId: 'dev', namespace: buildNamespace('dev', 'editor', 'docs'), type: 'editor', title: 'Documentation', ...layout(ORIGIN_DEV, 820, 0, 400, 400), zIndex: 9 },
-    // Tasks bottom right
-    { id: 'tasks', contextId: 'dev', namespace: buildNamespace('dev', 'terminal', 'tasks'), type: 'terminal', title: 'Mission Control', ...layout(ORIGIN_DEV, 820, 420, 400, 200), zIndex: 10 },
-
-    // --- BLUEPRINTS (Top Row Split, Bottom Full) ---
-    // DB Schema Top Left
-    { id: 'db', contextId: 'design', namespace: buildNamespace('design', 'visual', 'db'), type: 'visual', title: 'Schema Designer', ...layout(ORIGIN_DESIGN, 0, 0, 600, 450), zIndex: 10 },
-    // Arch Top Right
-    { id: 'arch', contextId: 'design', namespace: buildNamespace('design', 'visual', 'arch'), type: 'visual', title: 'Architecture', ...layout(ORIGIN_DESIGN, 620, 0, 600, 450), zIndex: 10 },
-    // Git Timeline Bottom Full
-    { id: 'git', contextId: 'design', namespace: buildNamespace('design', 'terminal', 'git'), type: 'terminal', title: 'Source Control', ...layout(ORIGIN_DESIGN, 0, 470, 1220, 300), zIndex: 10 },
-
-    // --- SYSTEM OPS (Top Full, Bottom Split) ---
-    // Pipeline Monitor Top Full
-    { id: 'pipeline', contextId: 'ops', namespace: buildNamespace('ops', 'terminal', 'pipeline'), type: 'terminal', title: 'CI/CD Pipeline', ...layout(ORIGIN_OPS, 0, 0, 1220, 350), zIndex: 10 },
-    // Process Monitor Bottom Left
-    { id: 'process', contextId: 'ops', namespace: buildNamespace('ops', 'terminal', 'process'), type: 'terminal', title: 'Process Dashboard', ...layout(ORIGIN_OPS, 0, 370, 600, 400), zIndex: 10 },
-    // System Logs Bottom Right
-    { id: 'logs', contextId: 'ops', namespace: buildNamespace('ops', 'terminal', 'logs'), type: 'terminal', title: 'System Logs', ...layout(ORIGIN_OPS, 620, 370, 600, 400), zIndex: 10 },
-
-    // --- VISUAL STUDIO (Left/Right Split) ---
-    // UI Preview Large Left
-    { id: 'ui', contextId: 'studio', namespace: buildNamespace('studio', 'visual', 'ui'), type: 'visual', title: 'UI Preview', ...layout(ORIGIN_STUDIO, 0, 0, 800, 720), zIndex: 11 },
-    // Diff Viewer Narrow Right
-    { id: 'diff', contextId: 'studio', namespace: buildNamespace('studio', 'editor', 'diff'), type: 'editor', title: 'Diff Viewer', ...layout(ORIGIN_STUDIO, 820, 0, 400, 720), zIndex: 10 },
+  // DEV CORE
+  { id: 'code', contextId: 'dev', namespace: buildNamespace('dev', 'editor', 'code'), type: 'editor', title: 'Code Editor', ...layout(WORKSPACE_ORIGINS.dev, 0, 0, 800, 620), zIndex: 10 },
+  { id: 'docs', contextId: 'dev', namespace: buildNamespace('dev', 'editor', 'docs'), type: 'editor', title: 'Documentation', ...layout(WORKSPACE_ORIGINS.dev, 820, 0, 400, 400), zIndex: 9 },
+  { id: 'tasks', contextId: 'dev', namespace: buildNamespace('dev', 'terminal', 'tasks'), type: 'terminal', title: 'Mission Control', ...layout(WORKSPACE_ORIGINS.dev, 820, 420, 400, 200), zIndex: 10 },
+  
+  // BLUEPRINTS
+  { id: 'db', contextId: 'design', namespace: buildNamespace('design', 'visual', 'db'), type: 'visual', title: 'Schema Designer', ...layout(WORKSPACE_ORIGINS.design, 0, 0, 600, 450), zIndex: 10 },
+  { id: 'arch', contextId: 'design', namespace: buildNamespace('design', 'visual', 'arch'), type: 'visual', title: 'Architecture', ...layout(WORKSPACE_ORIGINS.design, 620, 0, 600, 450), zIndex: 10 },
+  { id: 'git', contextId: 'design', namespace: buildNamespace('design', 'terminal', 'git'), type: 'terminal', title: 'Source Control', ...layout(WORKSPACE_ORIGINS.design, 0, 470, 1220, 300), zIndex: 10 },
+  
+  // SYSTEM OPS
+  { id: 'pipeline', contextId: 'ops', namespace: buildNamespace('ops', 'terminal', 'pipeline'), type: 'terminal', title: 'CI/CD Pipeline', ...layout(WORKSPACE_ORIGINS.ops, 0, 0, 1220, 350), zIndex: 10 },
+  { id: 'process', contextId: 'ops', namespace: buildNamespace('ops', 'terminal', 'process'), type: 'terminal', title: 'Process Dashboard', ...layout(WORKSPACE_ORIGINS.ops, 0, 370, 600, 400), zIndex: 10 },
+  { id: 'logs', contextId: 'ops', namespace: buildNamespace('ops', 'terminal', 'logs'), type: 'terminal', title: 'System Logs', ...layout(WORKSPACE_ORIGINS.ops, 620, 370, 600, 400), zIndex: 10 },
+  
+  // VISUAL STUDIO
+  { id: 'ui', contextId: 'studio', namespace: buildNamespace('studio', 'visual', 'ui'), type: 'visual', title: 'UI Preview', ...layout(WORKSPACE_ORIGINS.studio, 0, 0, 800, 720), zIndex: 11 },
+  { id: 'diff', contextId: 'studio', namespace: buildNamespace('studio', 'editor', 'diff'), type: 'editor', title: 'Diff Viewer', ...layout(WORKSPACE_ORIGINS.studio, 820, 0, 400, 720), zIndex: 10 },
 ];
 
 const INITIAL_THREADS: AiThread[] = [
-    { id: 't1', targetId: 'code', topic: 'Refactoring API', messageCount: 3, isActive: true },
-    { id: 't2', targetId: 'pipeline', topic: 'Fixing Build Fail', messageCount: 5, isActive: true },
-    { id: 't3', targetId: 'db', topic: 'Schema Migration', messageCount: 1, isActive: true },
+  { id: 't1', targetId: 'code', topic: 'Refactoring API', messageCount: 3, isActive: true },
+  { id: 't2', targetId: 'pipeline', topic: 'Fixing Build Fail', messageCount: 5, isActive: true },
+  { id: 't3', targetId: 'db', topic: 'Schema Migration', messageCount: 1, isActive: true },
 ];
 
-const generateId = () => Math.random().toString(36).substring(2, 9);
+// --- TYPES ---
 
-// --- CONTEXT DEFINITION ---
+export interface SyntheticLayout {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  opacity: number;
+  pointerEvents: 'auto' | 'none';
+}
 
 interface HudContextType {
   // Data State
@@ -111,14 +137,14 @@ interface HudContextType {
   setActiveView: (view: ViewMode) => void;
   setNamespaceQuery: (query: string) => void;
   updateWindow: (id: string, updates: Partial<WindowState>) => void;
-  closeWindow: (id: string) => void; // New
-  restoreContextDefaults: (contextId: string) => void; // New
+  closeWindow: (id: string) => void;
+  addWindow: (window: WindowState) => void;
+  restoreContextDefaults: (contextId: string) => void;
   selectWindow: (id: string) => void;
   focusWindow: (id: string) => WindowState | undefined;
   resetLayout: () => void;
   checkAuth: () => boolean;
-  // Layout Engine
-  getSyntheticLayout: (win: WindowState, viewport: {width: number, height: number}, panOffset: {x: number, y: number}, scale: number) => { x: number, y: number, w: number, h: number, opacity: number, pointerEvents: 'auto' | 'none' };
+  getSyntheticLayout: (win: WindowState, viewport: {width: number, height: number}, panOffset: {x: number, y: number}, scale: number) => SyntheticLayout;
 }
 
 const HudContext = createContext<HudContextType | undefined>(undefined);
@@ -126,83 +152,77 @@ const HudContext = createContext<HudContextType | undefined>(undefined);
 export const HudProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { hasApiKey, checkAuth } = useAuth();
 
-  // -- State: Persistence Enabled --
-  const [tasks, setTasks] = useState<Task[]>(() => {
-    const saved = localStorage.getItem('hud_tasks');
-    return saved ? JSON.parse(saved) : MOCK_TASKS;
-  });
-
-  const [messages, setMessages] = useState<Message[]>(() => {
-    const saved = localStorage.getItem('hud_messages');
-    if (saved) return JSON.parse(saved);
-    return [{
-      id: '1',
-      role: 'model',
-      content: 'Agent operational. Visual primitives loaded. Ready for development cycle.',
-      timestamp: Date.now()
-    }];
-  });
+  // -- State: Persistence Enabled (using hook) --
+  const [tasks, setTasks] = usePersistentState<Task[]>('hud_tasks', MOCK_TASKS);
+  
+  const [messages, setMessages] = usePersistentState<Message[]>('hud_messages', [{
+    id: '1',
+    role: 'model',
+    content: 'Agent operational. Visual primitives loaded. Ready for development cycle.',
+    timestamp: Date.now()
+  }]);
 
   // -- State: Ephemeral --
+  // CONTENT: Current tool instances/windows (not persisted)
+  // This is the live array of WindowState instances that exist right now.
+  // Starts with DEFAULT_WINDOWS, can be modified via addWindow/updateWindow/closeWindow
   const [windows, setWindows] = useState<WindowState[]>(DEFAULT_WINDOWS);
   const [activeThreads, setActiveThreads] = useState<AiThread[]>(INITIAL_THREADS);
-  const [activeContextIdState, setActiveContextIdState] = useState<string>('global'); // Default to Global
+  const [activeContextIdState, setActiveContextIdState] = useState<string>('global');
   const [activeView, setActiveView] = useState<ViewMode>('spatial');
   const [namespaceQuery, setNamespaceQueryState] = useState<string>(DEFAULT_NAMESPACE_QUERY);
   const [isProcessing, setIsProcessing] = useState(false);
 
-  // -- Persistence Effects --
-  useEffect(() => {
-    localStorage.setItem('hud_tasks', JSON.stringify(tasks));
-  }, [tasks]);
-
-  useEffect(() => {
-    localStorage.setItem('hud_messages', JSON.stringify(messages));
-  }, [messages]);
+  // -- Memoized Filtered Windows (Performance Improvement) --
+  const filteredWindows = useMemo(() => {
+    return windows
+      .filter(w => matchesNamespace(namespaceQuery, w.namespace))
+      .filter(w => matchesViewType(w.type, activeView))
+      .sort((a, b) => a.id.localeCompare(b.id));
+  }, [windows, namespaceQuery, activeView]);
 
   // -- Gemini Initialization --
   useEffect(() => {
     if (!hasApiKey) return;
 
-    // Re-initialize chat with history on mount
     const history = messages.slice(1).map(m => ({
-        role: m.role,
-        parts: [{ text: m.content }]
+      role: m.role,
+      parts: [{ text: m.content }]
     }));
     geminiService.startChat(history);
-  }, [hasApiKey]); // Run when API key becomes available
+  }, [hasApiKey, messages]);
 
   // -- Actions --
 
   const createTask = useCallback((partialTask: Partial<Task>): string => {
     const newTask: Task = {
-        id: generateId(),
-        title: partialTask.title || 'Untitled Session',
-        priority: partialTask.priority || 'medium',
-        status: 'pending',
-        createdAt: Date.now()
+      id: generateId('task'),
+      title: partialTask.title || 'Untitled Session',
+      priority: partialTask.priority || 'medium',
+      status: 'pending',
+      createdAt: Date.now()
     };
     setTasks(prev => [newTask, ...prev]);
     return newTask.id;
-  }, []);
+  }, [setTasks]);
 
   const completeTask = useCallback((taskId: string): string => {
     let found = false;
     setTasks(prev => prev.map(t => {
-        if (t.id === taskId || t.title.toLowerCase().includes(taskId.toLowerCase())) {
-            found = true;
-            return { ...t, status: 'completed' };
-        }
-        return t;
+      if (t.id === taskId || t.title.toLowerCase().includes(taskId.toLowerCase())) {
+        found = true;
+        return { ...t, status: 'completed' };
+      }
+      return t;
     }));
     return found ? "Session marked complete." : "Session ID not found.";
-  }, []);
+  }, [setTasks]);
 
   const sendMessage = useCallback(async (text: string, scope?: string) => {
     if (!checkAuth()) return;
 
     const userMsg: Message = {
-      id: generateId(),
+      id: generateId('msg'),
       role: 'user',
       content: text,
       timestamp: Date.now()
@@ -211,10 +231,7 @@ export const HudProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setIsProcessing(true);
 
     try {
-      let contextText = text;
-      if (scope) {
-         contextText = `[SCOPE: ${scope}] ${text}`;
-      }
+      const contextText = scope ? `[SCOPE: ${scope}] ${text}` : text;
 
       const responseText = await geminiService.sendMessage(contextText, {
         tasks,
@@ -223,26 +240,30 @@ export const HudProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       });
 
       const modelMsg: Message = {
-        id: generateId(),
+        id: generateId('msg'),
         role: 'model',
         content: responseText,
         timestamp: Date.now()
       };
       setMessages(prev => [...prev, modelMsg]);
     } catch (error) {
-      console.error(error);
-      setMessages(prev => [...prev, {
-        id: generateId(),
+      console.error('Failed to send message:', error);
+      const errorMsg: Message = {
+        id: generateId('msg'),
         role: 'system',
-        content: "ERR: LINK_FAILURE",
+        content: error instanceof Error 
+          ? `ERR: ${error.message}` 
+          : "ERR: LINK_FAILURE",
         timestamp: Date.now()
-      }]);
+      };
+      setMessages(prev => [...prev, errorMsg]);
     } finally {
       setIsProcessing(false);
     }
-  }, [tasks, createTask, completeTask]);
+  }, [tasks, createTask, completeTask, checkAuth, setMessages]);
 
   // -- Window & UI Actions --
+
   const setActiveContextId = useCallback((id: string) => {
     setActiveContextIdState(id);
     const nextQuery = id === 'global' ? DEFAULT_NAMESPACE_QUERY : `hud.${id}.**`;
@@ -264,26 +285,46 @@ export const HudProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setWindows(prev => prev.filter(w => w.id !== id));
   }, []);
 
+  const addWindow = useCallback((window: WindowState) => {
+    setWindows(prev => {
+      const maxZ = prev.length > 0 
+        ? Math.max(...prev.map(w => w.zIndex))
+        : 0;
+      return [...prev, { ...window, zIndex: maxZ + 1 }];
+    });
+  }, []);
+
   const restoreContextDefaults = useCallback((contextId: string) => {
     const defaults = DEFAULT_WINDOWS.filter(w => w.contextId === contextId);
     setWindows(prev => {
-        const existingIds = new Set(prev.map(w => w.id));
-        const toAdd = defaults.filter(w => !existingIds.has(w.id));
-        return [...prev, ...toAdd];
+      const existingIds = new Set(prev.map(w => w.id));
+      const toAdd = defaults.filter(w => !existingIds.has(w.id));
+      return [...prev, ...toAdd];
     });
   }, []);
 
   const selectWindow = useCallback((id: string) => {
     setWindows(prev => {
-        const maxZ = Math.max(...prev.map(w => w.zIndex));
-        return prev.map(w => w.id === id ? { ...w, zIndex: maxZ + 1 } : w);
+      const maxZ = prev.length > 0
+        ? Math.max(...prev.map(w => w.zIndex))
+        : 0;
+      return prev.map(w => 
+        w.id === id ? { ...w, zIndex: maxZ + 1 } : w
+      );
     });
   }, []);
 
+  // Fixed: Use functional update to avoid stale closure
   const focusWindow = useCallback((id: string) => {
-      selectWindow(id);
-      return windows.find(w => w.id === id);
-  }, [selectWindow, windows]);
+    selectWindow(id);
+    // Use functional update pattern - get latest windows
+    let found: WindowState | undefined;
+    setWindows(prev => {
+      found = prev.find(w => w.id === id);
+      return prev; // No change, just reading
+    });
+    return found;
+  }, [selectWindow]);
 
   const resetLayout = useCallback(() => {
     setWindows(DEFAULT_WINDOWS);
@@ -292,99 +333,76 @@ export const HudProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setNamespaceQueryState(DEFAULT_NAMESPACE_QUERY);
   }, []);
 
-  // -- SYNTHETIC LAYOUT ENGINE (HIERARCHICAL) --
-  const getSyntheticLayout = useCallback((win: WindowState, viewport: {width: number, height: number}, panOffset: {x: number, y: number}, scale: number) => {
-      
-      // -- FILTER LEVEL 1: SCOPE (Namespace Query) --
-      // If the window doesn't match the active namespace query, it is hidden.
-      if (!matchesNamespace(namespaceQuery, win.namespace)) {
-          return {
-              x: win.x,
-              y: win.y,
-              w: win.w,
-              h: win.h,
-              opacity: 0, // Fully hidden
-              pointerEvents: 'none' as const
-          };
-      }
-
-      // -- FILTER LEVEL 2: VIEW MODE (Left Dock) --
-      // Even if in scope, we might filter by type (Terminal vs Editor).
-      let matchesType = true;
-      if (activeView === 'terminals' && win.type !== 'terminal') matchesType = false;
-      if (activeView === 'editors' && win.type !== 'editor') matchesType = false;
-      if (activeView === 'visuals' && win.type !== 'visual') matchesType = false;
-
-      if (!matchesType) {
-          return {
-              x: win.x,
-              y: win.y,
-              w: win.w,
-              h: win.h,
-              opacity: 0, // Fully hidden
-              pointerEvents: 'none' as const
-          };
-      }
-
-      // -- LAYOUT LEVEL: SPATIAL vs GRID --
-      
-      // If Spatial View: Return actual coordinates
-      if (activeView === 'spatial') {
-          return {
-              x: win.x,
-              y: win.y,
-              w: win.w,
-              h: win.h,
-              opacity: 1,
-              pointerEvents: 'auto' as const
-          };
-      }
-
-      // If Grid View: Calculate Grid Position based on FILTERED list
-      // 1. Get list of ALL windows that satisfy the current Scope AND View filters
-      const matchingWindows = [...windows]
-          .filter(w => {
-              const scopeMatch = matchesNamespace(namespaceQuery, w.namespace);
-              
-              let typeMatch = true;
-              if (activeView === 'terminals' && w.type !== 'terminal') typeMatch = false;
-              if (activeView === 'editors' && w.type !== 'editor') typeMatch = false;
-              if (activeView === 'visuals' && w.type !== 'visual') typeMatch = false;
-              
-              return scopeMatch && typeMatch;
-          })
-          .sort((a, b) => a.id.localeCompare(b.id)); // Stable Sort
-
-      const index = matchingWindows.findIndex(w => w.id === win.id);
-      
-      // Grid Constants
-      const gap = 40;
-      const gridW = 700;
-      const gridH = 500;
-      
-      const cols = Math.ceil(Math.sqrt(matchingWindows.length));
-      
-      const totalW = (cols * gridW) + ((cols - 1) * gap);
-      const totalH = (Math.ceil(matchingWindows.length / cols) * gridH) + ((Math.ceil(matchingWindows.length / cols) - 1) * gap);
-      
-      const vpCenterX = (-panOffset.x) + (viewport.width / 2 / scale);
-      const vpCenterY = (-panOffset.y) + (viewport.height / 2 / scale);
-      
-      const startX = vpCenterX - (totalW / 2);
-      const startY = vpCenterY - (totalH / 2);
-      
-      const col = index % cols;
-      const row = Math.floor(index / cols);
-
+  // -- IMPROVED SYNTHETIC LAYOUT ENGINE --
+  const getSyntheticLayout = useCallback((
+    win: WindowState, 
+    viewport: {width: number, height: number}, 
+    panOffset: {x: number, y: number}, 
+    scale: number
+  ): SyntheticLayout => {
+    // Check if window matches filters (using memoized filteredWindows)
+    const scopeMatch = matchesNamespace(namespaceQuery, win.namespace);
+    const typeMatch = matchesViewType(win.type, activeView);
+    
+    if (!scopeMatch || !typeMatch) {
       return {
-          x: startX + (col * (gridW + gap)),
-          y: startY + (row * (gridH + gap)),
-          w: gridW,
-          h: gridH,
-          opacity: 1,
-          pointerEvents: 'auto' as const
+        x: win.x,
+        y: win.y,
+        w: win.w,
+        h: win.h,
+        opacity: 0,
+        pointerEvents: 'none'
       };
-  }, [activeView, windows, namespaceQuery]);
+    }
+
+    // Spatial view: use actual coordinates
+    if (activeView === 'spatial') {
+      return {
+        x: win.x,
+        y: win.y,
+        w: win.w,
+        h: win.h,
+        opacity: 1,
+        pointerEvents: 'auto'
+      };
+    }
+
+    // Grid view: calculate position from filtered list
+    const index = filteredWindows.findIndex(w => w.id === win.id);
+    if (index === -1) {
+      return {
+        x: win.x,
+        y: win.y,
+        w: win.w,
+        h: win.h,
+        opacity: 0,
+        pointerEvents: 'none'
+      };
+    }
+
+    const cols = Math.ceil(Math.sqrt(filteredWindows.length));
+    const totalW = (cols * GRID_LAYOUT.width) + ((cols - 1) * GRID_LAYOUT.gap);
+    const totalH = (Math.ceil(filteredWindows.length / cols) * GRID_LAYOUT.height) + 
+                   ((Math.ceil(filteredWindows.length / cols) - 1) * GRID_LAYOUT.gap);
+    
+    const vpCenterX = (-panOffset.x) + (viewport.width / 2 / scale);
+    const vpCenterY = (-panOffset.y) + (viewport.height / 2 / scale);
+    
+    const startX = vpCenterX - (totalW / 2);
+    const startY = vpCenterY - (totalH / 2);
+    
+    const col = index % cols;
+    const row = Math.floor(index / cols);
+
+    return {
+      x: startX + (col * (GRID_LAYOUT.width + GRID_LAYOUT.gap)),
+      y: startY + (row * (GRID_LAYOUT.height + GRID_LAYOUT.gap)),
+      w: GRID_LAYOUT.width,
+      h: GRID_LAYOUT.height,
+      opacity: 1,
+      pointerEvents: 'auto'
+    };
+  }, [namespaceQuery, activeView, filteredWindows]);
 
   return (
     <HudContext.Provider value={{
@@ -405,6 +423,7 @@ export const HudProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setNamespaceQuery,
       updateWindow,
       closeWindow,
+      addWindow,
       restoreContextDefaults,
       selectWindow,
       focusWindow,

@@ -30,12 +30,29 @@ Keep responses concise, helpful, and direct. You can control the interface.
 - create_task: Add a new task
 - complete_task: Mark a task as done
 
+### Text Lab (Code & Email Editing)
+- open_text_lab: Open the text editing lab
+- get_text: Read the current content of a source (code or email)
+- propose_edit: Suggest changes to a source - shows a diff for user to review
+- apply_edit: Apply the pending changes after user approval
+- switch_text_source: Switch between code and email sources
+
+### Dither Tool (Creative Playground)
+- open_dither_tool: Open the dither/pixel art tool
+- set_dither_settings: Adjust pixel size, color palette, algorithm, contrast, brightness
+  - pixelSize: 1-16 (higher = more pixelated)
+  - palette: grayscale, gameboy, cga, sepia, cyber
+  - algorithm: ordered, floyd-steinberg, atkinson, none
+  - contrast: 0.5-2.0 (1.0 = normal)
+  - brightness: -0.5 to 0.5 (0 = normal)
+
 ## Guidelines:
 - When asked to show something, use focus_window or create_window
 - When asked to organize, use set_view or change_context
 - When asked "what's on screen" or similar, use list_windows
 - Be proactive - if user mentions wanting to code, offer to focus the code window
 - Keep responses brief - the interface speaks for itself
+- For the dither tool: respond to creative requests like "make it more pixelated", "retro game look", "black and white"
 `;
 
 export const MOCK_TASKS: Task[] = [
@@ -132,7 +149,7 @@ export const HUD_TOOLS: FunctionDeclaration[] = [
       properties: {
         type: {
           type: Type.STRING,
-          enum: ['code', 'terminal', 'docs', 'db', 'arch', 'git', 'pipeline', 'logs', 'ui', 'system', 'tasks', 'chat'],
+          enum: ['code', 'terminal', 'docs', 'db', 'arch', 'git', 'pipeline', 'logs', 'ui', 'system', 'tasks', 'chat', 'dither'],
           description: 'The type of window to create'
         },
         title: {
@@ -194,6 +211,121 @@ export const HUD_TOOLS: FunctionDeclaration[] = [
     parameters: {
       type: Type.OBJECT,
       properties: {}
+    }
+  },
+  {
+    name: 'open_text_lab',
+    description: 'Open the text editing lab for editing code or email drafts.',
+    parameters: {
+      type: Type.OBJECT,
+      properties: {}
+    }
+  },
+  {
+    name: 'get_text',
+    description: 'Get the current content of a text source to understand what the user is working on.',
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        source: {
+          type: Type.STRING,
+          enum: ['code', 'email'],
+          description: 'Which source to read: code (JavaScript) or email (prose)'
+        }
+      },
+      required: ['source']
+    }
+  },
+  {
+    name: 'propose_edit',
+    description: 'Propose changes to a text source. This shows a diff view for the user to review before accepting.',
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        source: {
+          type: Type.STRING,
+          enum: ['code', 'email'],
+          description: 'Which source to edit'
+        },
+        newContent: {
+          type: Type.STRING,
+          description: 'The complete new content for the source (not a partial diff)'
+        },
+        description: {
+          type: Type.STRING,
+          description: 'Brief description of the changes made'
+        }
+      },
+      required: ['source', 'newContent']
+    }
+  },
+  {
+    name: 'apply_edit',
+    description: 'Apply pending changes to a source after the user has reviewed the diff. Only call this after propose_edit and user approval.',
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        source: {
+          type: Type.STRING,
+          enum: ['code', 'email'],
+          description: 'Which source to apply changes to'
+        }
+      },
+      required: ['source']
+    }
+  },
+  {
+    name: 'switch_text_source',
+    description: 'Switch the active view in the text lab between code and email.',
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        source: {
+          type: Type.STRING,
+          enum: ['code', 'email'],
+          description: 'Which source to switch to'
+        }
+      },
+      required: ['source']
+    }
+  },
+  {
+    name: 'open_dither_tool',
+    description: 'Open the dither/pixel art tool for creative image processing.',
+    parameters: {
+      type: Type.OBJECT,
+      properties: {}
+    }
+  },
+  {
+    name: 'set_dither_settings',
+    description: 'Adjust the dither tool settings. Use this to make images more pixelated, change color palettes, or apply retro effects.',
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        pixelSize: {
+          type: Type.NUMBER,
+          description: 'Pixel block size 1-16. Higher = more pixelated/chunky. 1=full detail, 4=retro, 8=very chunky, 16=abstract'
+        },
+        palette: {
+          type: Type.STRING,
+          enum: ['grayscale', 'gameboy', 'cga', 'sepia', 'cyber'],
+          description: 'Color palette. grayscale=B&W, gameboy=green monochrome, cga=retro PC, sepia=vintage, cyber=neon'
+        },
+        algorithm: {
+          type: Type.STRING,
+          enum: ['ordered', 'floyd-steinberg', 'atkinson', 'none'],
+          description: 'Dithering algorithm. ordered=bayer pattern, floyd-steinberg=smooth gradients, atkinson=classic Mac, none=hard edges'
+        },
+        contrast: {
+          type: Type.NUMBER,
+          description: 'Contrast multiplier 0.5-2.0. 1.0=normal, <1=washed out, >1=punchy'
+        },
+        brightness: {
+          type: Type.NUMBER,
+          description: 'Brightness adjustment -0.5 to 0.5. 0=normal, negative=darker, positive=brighter'
+        }
+      }
     }
   }
 ];

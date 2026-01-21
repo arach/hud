@@ -2,17 +2,17 @@ import { lazy, ComponentType } from 'react';
 
 /**
  * Tool Registry - CHROME/FRAMEWORK CONCEPT
- * 
+ *
  * This registry defines AVAILABLE tool types (templates/blueprints).
  * It is part of the HUD chrome/scaffolding - the framework that knows
  * what tools can be instantiated.
- * 
+ *
  * Tool INSTANCES (content) are created separately via WindowState objects
  * and rendered using DraggableWindow containers. Each instance has:
  * - Unique id, position (x, y), size (w, h)
  * - Its own state/data
  * - Can be created/destroyed dynamically
- * 
+ *
  * See ARCHITECTURE.md for distinction between Chrome and Content.
  */
 
@@ -25,10 +25,29 @@ export interface ToolDefinition {
   category: 'dev' | 'ops' | 'creative' | 'system';
 }
 
+// Explicit lazy imports for each tool component
+// This ensures Vite can properly analyze and bundle each module
+const lazyComponents = {
+  CodeEditor: lazy(() => import('./CodeEditor.tsx')),
+  DbSchema: lazy(() => import('./DbSchema.tsx')),
+  GitGraph: lazy(() => import('./GitGraph.tsx')),
+  ArchDiagram: lazy(() => import('./ArchDiagram.tsx')),
+  PipelineMonitor: lazy(() => import('./PipelineMonitor.tsx')),
+  LogViewer: lazy(() => import('./LogViewer.tsx')),
+  DiffViewer: lazy(() => import('./DiffViewer.tsx')),
+  DocsEditor: lazy(() => import('./DocsEditor.tsx')),
+  UiPreview: lazy(() => import('./UiPreview.tsx')),
+  SystemMonitor: lazy(() => import('./SystemMonitor.tsx')),
+  DitherTool: lazy(() => import('./DitherTool.tsx')),
+  TextLab: lazy(() => import('./TextLab.tsx')),
+} as const;
+
+type ComponentName = keyof typeof lazyComponents;
+
 type ToolConfig = {
   label: string;
   icon: string;
-  componentName: string;
+  componentName: ComponentName;
   category: ToolDefinition['category'];
   type?: string; // Optional override, defaults to key
 };
@@ -42,7 +61,7 @@ const createTool = (
   type: config.type ?? id,
   label: config.label,
   icon: config.icon,
-  component: lazy(() => import(`./${config.componentName}`)),
+  component: lazyComponents[config.componentName],
   category: config.category,
 });
 

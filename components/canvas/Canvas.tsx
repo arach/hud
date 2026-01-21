@@ -8,6 +8,7 @@ interface CanvasProps {
   onPanEnd?: () => void;
   isPanLocked?: boolean;
   onDebug?: (state: CanvasDebugState) => void;
+  onClick?: (e: React.MouseEvent) => void; // Click handler (only fires if not panning)
 }
 
 export interface CanvasDebugState {
@@ -22,7 +23,7 @@ export interface CanvasDebugState {
   isSpaceDown: boolean;
 }
 
-const Canvas: React.FC<CanvasProps> = ({ panOffset, scale, onPan, onPanStart, onPanEnd, isPanLocked = false, onDebug }) => {
+const Canvas: React.FC<CanvasProps> = ({ panOffset, scale, onPan, onPanStart, onPanEnd, isPanLocked = false, onDebug, onClick }) => {
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
   const [showGuides, setShowGuides] = useState(true);
   const [isPanning, setIsPanning] = useState(false);
@@ -38,6 +39,7 @@ const Canvas: React.FC<CanvasProps> = ({ panOffset, scale, onPan, onPanStart, on
   const spaceTimeoutRef = useRef<number | null>(null);
   const lastSpaceAtRef = useRef(0);
   const spaceStaleMs = 2500;
+  const didPanRef = useRef(false); // Track if we panned during this interaction
 
   const isEditableTarget = useCallback((target: EventTarget | null) => {
     const element = target as HTMLElement | null;
@@ -139,6 +141,7 @@ const Canvas: React.FC<CanvasProps> = ({ panOffset, scale, onPan, onPanStart, on
         if (Math.hypot(dx, dy) >= panThreshold) {
           pendingPanRef.current.active = false;
           setPanning(true);
+          didPanRef.current = true; // Mark that we panned
           onPanStart?.();
           lastPanRef.current = { x: e.clientX, y: e.clientY };
           document.body.style.cursor = 'grabbing';
@@ -238,6 +241,7 @@ const Canvas: React.FC<CanvasProps> = ({ panOffset, scale, onPan, onPanStart, on
   }, [isPanLocked, onPanEnd, setPanning, emitDebug]);
 
   const handleMouseDown = (e: React.MouseEvent) => {
+    didPanRef.current = false; // Reset pan tracking on new interaction
     if (isPanLocked) return;
     if (e.button !== 0) return;
     if (!isSpaceDownRef.current) return;
@@ -247,6 +251,14 @@ const Canvas: React.FC<CanvasProps> = ({ panOffset, scale, onPan, onPanStart, on
     document.body.style.cursor = 'grab';
     e.preventDefault();
     emitDebug();
+  };
+
+  const handleClick = (e: React.MouseEvent) => {
+    // Only fire onClick if we didn't pan during this interaction
+    if (!didPanRef.current && onClick) {
+      onClick(e);
+    }
+    didPanRef.current = false;
   };
 
   // Adjust grid density based on scale to prevent it from disappearing or becoming too dense
@@ -267,6 +279,7 @@ const Canvas: React.FC<CanvasProps> = ({ panOffset, scale, onPan, onPanStart, on
         ref={containerRef}
         className={`absolute inset-0 z-0 overflow-hidden bg-black ${canvasCursor}`}
         onMouseDown={handleMouseDown}
+        onClick={handleClick}
     >
       {/* Subtle dot pattern - gives sense of navigable space */}
       {/* Extended beyond viewport to prevent edge artifacts at various zoom levels */}

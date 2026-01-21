@@ -70,6 +70,7 @@ const App: React.FC = () => {
   const [isPanActive, setIsPanActive] = useState(false);
   const [isPanSettling, setIsPanSettling] = useState(false);
   const [pendingContextFocusId, setPendingContextFocusId] = useState<string | null>(null);
+  const [isOverviewMode, setIsOverviewMode] = useState(true); // Start in overview mode
   const [hudLogs, setHudLogs] = useState<HudLogEntry[]>([]);
   const [canvasDebug, setCanvasDebug] = useState<CanvasDebugState | null>(null);
   const canvasDebugRef = useRef<CanvasDebugState | null>(null);
@@ -78,6 +79,7 @@ const App: React.FC = () => {
   const viewportRef = useRef(viewport);
   const panSettleTimerRef = useRef<number | null>(null);
   const focusDebugTimerRef = useRef<number | null>(null);
+  const hasInitializedRef = useRef(false);
   
   // Transition State
   const [isTransitioning, setIsTransitioning] = useState(false);
@@ -173,6 +175,22 @@ Alex`
     checkAuth,
     getSyntheticLayout
   } = useHud();
+
+  // Context zone sizes (used by findNearestContext and other components)
+  const contextSizes = useMemo(() => {
+    const sizes: Record<string, { width: number; height: number }> = {};
+    contexts.forEach(ctx => {
+      if (ctx.id === 'global') return;
+      let width = 1220;
+      let height = 800;
+      if (ctx.id === 'dev') { width = 1220; height = 620; }
+      if (ctx.id === 'design') { width = 1220; height = 770; }
+      if (ctx.id === 'ops') { width = 1220; height = 770; }
+      if (ctx.id === 'studio') { width = 1220; height = 720; }
+      sizes[ctx.id] = { width, height };
+    });
+    return sizes;
+  }, [contexts]);
 
   // -- Effects --
   useEffect(() => {
@@ -394,6 +412,20 @@ Alex`
 
   }, [windows, scale, setPanOffsetWithLog, getHudSafeViewport]);
 
+  // Initial mount effect to show "view all" state
+  useEffect(() => {
+    if (hasInitializedRef.current) return;
+    hasInitializedRef.current = true;
+
+    // Small delay to let layout settle
+    const timer = setTimeout(() => {
+      focusContext('global');
+      setIsOverviewMode(true);
+    }, 100);
+
+    return () => clearTimeout(timer);
+  }, [focusContext]);
+
   useEffect(() => {
     if (!pendingContextFocusId) return;
     if (activeView !== 'spatial') return;
@@ -442,7 +474,35 @@ Alex`
     }, 350);
   }, []);
 
+  // Find nearest context zone to a screen coordinate
+  const findNearestContext = useCallback((screenX: number, screenY: number) => {
+    const safeViewport = getHudSafeViewport();
+    // Convert screen coords to world coords
+    const worldX = (screenX - safeViewport.centerX) / scale - panOffset.x;
+    const worldY = (screenY - safeViewport.centerY) / scale - panOffset.y;
+
+    // Find nearest context zone center
+    let nearestCtx: ContextDef | null = null;
+    let minDist = Infinity;
+
+    contexts.forEach(ctx => {
+      if (ctx.id === 'global') return;
+      const size = contextSizes[ctx.id];
+      if (!size) return;
+      const centerX = ctx.x + size.width / 2;
+      const centerY = ctx.y + size.height / 2;
+      const dist = Math.hypot(worldX - centerX, worldY - centerY);
+      if (dist < minDist) {
+        minDist = dist;
+        nearestCtx = ctx;
+      }
+    });
+
+    return nearestCtx;
+  }, [scale, panOffset, contexts, contextSizes, getHudSafeViewport]);
+
   const handleZoom = useCallback((newScale: number, panAdjust?: { x: number; y: number }) => {
+      setIsOverviewMode(false); // Exit overview mode on manual zoom
       setScale(newScale);
       if (panAdjust) {
         setPanOffset(prev => ({
@@ -476,6 +536,7 @@ Alex`
   }, [setPanOffsetWithLog]);
 
   const handleContextSelect = useCallback((ctx: ContextDef) => {
+      setIsOverviewMode(false); // Exit overview mode when selecting a context
       setActiveView('spatial');
       setActiveContextId(ctx.id);
       setSelectedContextId(ctx.id);
@@ -484,9 +545,23 @@ Alex`
       setPendingContextFocusId(ctx.id);
   }, [setActiveContextId, setActiveView]);
 
+  // Canvas click handler - zooms into nearest context zone when in overview mode
+  const handleCanvasClick = useCallback((e: React.MouseEvent) => {
+    if (!isOverviewMode) return;
+
+    const nearest = findNearestContext(e.clientX, e.clientY);
+    if (nearest) {
+      setIsOverviewMode(false);
+      handleContextSelect(nearest);
+    }
+  }, [isOverviewMode, findNearestContext, handleContextSelect]);
+
   const handleAutoLayout = useCallback(() => {
     resetLayout();
-    setTimeout(() => focusContext('global'), 10);
+    setTimeout(() => {
+      focusContext('global');
+      setIsOverviewMode(true);
+    }, 10);
   }, [resetLayout, focusContext]);
 
   const handleFocusWindow = useCallback((id: string) => {
@@ -708,6 +783,7 @@ Alex`
           }
           case 'view_all': {
               focusContext('global');
+              setIsOverviewMode(true);
               return { result: 'View reset to show all windows' };
           }
           case 'create_task': {
@@ -875,20 +951,6 @@ CURRENT HUD ENVIRONMENT:
     }
     return contexts.filter(ctx => ctx.id === activeContextId);
   }, [activeView, activeContextId, contexts, isScoped]);
-  const contextSizes = useMemo(() => {
-    const sizes: Record<string, { width: number; height: number }> = {};
-    contexts.forEach(ctx => {
-      if (ctx.id === 'global') return;
-      let width = 1220;
-      let height = 800;
-      if (ctx.id === 'dev') { width = 1220; height = 620; }
-      if (ctx.id === 'design') { width = 1220; height = 770; }
-      if (ctx.id === 'ops') { width = 1220; height = 770; }
-      if (ctx.id === 'studio') { width = 1220; height = 720; }
-      sizes[ctx.id] = { width, height };
-    });
-    return sizes;
-  }, [contexts]);
 
   // ARCHITECTURE: Chrome vs Content
   // 
@@ -905,10 +967,10 @@ CURRENT HUD ENVIRONMENT:
 
   return (
     <>
-      <HUDFrame 
-        panOffset={panOffset} 
-        scale={scale} 
-        onPan={handlePan} 
+      <HUDFrame
+        panOffset={panOffset}
+        scale={scale}
+        onPan={handlePan}
         onZoom={handleZoom}
         onPanStart={handlePanStart}
         onPanEnd={handlePanEnd}
@@ -917,6 +979,7 @@ CURRENT HUD ENVIRONMENT:
         filterActive={isFilterActive}
         onCanvasDebug={handleCanvasDebug}
         onViewportChange={handleViewportChange}
+        onCanvasClick={handleCanvasClick}
         hud={
           <>
             <NavigationStack
@@ -956,7 +1019,10 @@ CURRENT HUD ENVIRONMENT:
                   onToggleCollapse={() => setIsManifestCollapsed(prev => !prev)}
                   viewport={viewport}
                   onNavigate={handleNavigate}
-                  onViewAll={() => focusContext('global')}
+                  onViewAll={() => {
+                    focusContext('global');
+                    setIsOverviewMode(true);
+                  }}
               />
             )}
 
