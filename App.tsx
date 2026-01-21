@@ -494,6 +494,70 @@ const App: React.FC = () => {
               }
               return { error: 'Window not found' };
           }
+          case 'set_view': {
+              const view = args.view;
+              if (['spatial', 'terminals', 'editors', 'visuals'].includes(view)) {
+                  setActiveView(view);
+                  return { result: `View changed to ${view}` };
+              }
+              return { error: 'Invalid view mode' };
+          }
+          case 'zoom': {
+              const level = Math.max(0.2, Math.min(3, args.level));
+              setScale(level);
+              return { result: `Zoom set to ${Math.round(level * 100)}%` };
+          }
+          case 'toggle_terminal': {
+              if (args.open !== undefined) {
+                  setIsTerminalOpen(args.open);
+              } else {
+                  setIsTerminalOpen(prev => !prev);
+              }
+              return { result: args.open !== undefined ? (args.open ? 'Terminal opened' : 'Terminal closed') : 'Terminal toggled' };
+          }
+          case 'open_command_palette': {
+              setIsCmdPaletteOpen(true);
+              return { result: 'Command palette opened' };
+          }
+          case 'create_window': {
+              const newWindow: WindowState = {
+                  id: `${args.type}-${Date.now()}`,
+                  title: args.title || args.type.charAt(0).toUpperCase() + args.type.slice(1),
+                  type: args.type,
+                  x: 100 + Math.random() * 200,
+                  y: 100 + Math.random() * 200,
+                  w: 400,
+                  h: 300,
+                  zIndex: windows.length + 1,
+                  contextId: args.contextId || activeContextId,
+                  namespace: namespaceQuery,
+                  tags: []
+              };
+              setWindows(prev => [...prev, newWindow]);
+              return { result: `Created ${args.type} window: ${newWindow.id}` };
+          }
+          case 'close_window': {
+              const winId = args.windowId;
+              const win = windows.find(w => w.id === winId);
+              if (win) {
+                  setWindows(prev => prev.filter(w => w.id !== winId));
+                  return { result: `Closed window ${winId}` };
+              }
+              return { error: 'Window not found' };
+          }
+          case 'list_windows': {
+              const windowList = windows.map(w => ({
+                  id: w.id,
+                  title: w.title,
+                  type: w.type,
+                  context: w.contextId || 'global'
+              }));
+              return { result: windowList };
+          }
+          case 'view_all': {
+              handleViewAll();
+              return { result: 'View reset to show all windows' };
+          }
           case 'create_task': {
               const newId = createTask({
                   title: args.title,

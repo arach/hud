@@ -277,7 +277,7 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({
           </div>
         </div>
 
-        {/* Voice Chat Section */}
+        {/* Voice Chat Section - Live */}
         {isVoiceConnected && (
           <div className="shrink-0 border-t border-neutral-800/50 bg-black/30 flex flex-col" style={{ maxHeight: '50%' }}>
             <div className="shrink-0 px-4 py-2 border-b border-neutral-800/30 flex items-center gap-2">
@@ -311,6 +311,36 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({
                 ))
               )}
               <div ref={chatEndRef} />
+            </div>
+          </div>
+        )}
+
+        {/* Previous Chat Section - When disconnected but has history */}
+        {!isVoiceConnected && transcripts.length > 0 && (
+          <div className="shrink-0 border-t border-neutral-800/50 bg-neutral-950/50">
+            <div className="px-4 py-2 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Activity size={10} className="text-neutral-600" />
+                <span className="text-[9px] font-bold tracking-widest text-neutral-500 uppercase">Previous Chat</span>
+                <span className="text-[8px] text-neutral-600">({transcripts.length})</span>
+              </div>
+            </div>
+            <div className="px-3 pb-3 space-y-1.5 max-h-24 overflow-y-auto">
+              {transcripts.slice(-3).map((t, i) => (
+                <div
+                  key={i}
+                  className={`
+                    text-[9px] px-2 py-1 rounded truncate
+                    ${t.role === 'user'
+                      ? 'bg-neutral-900/40 text-neutral-500 ml-4'
+                      : 'bg-neutral-900/20 text-neutral-600 mr-4'
+                    }
+                  `}
+                >
+                  <span className="opacity-60 mr-1">{t.role === 'user' ? 'You:' : 'AI:'}</span>
+                  {t.text.slice(0, 60)}{t.text.length > 60 ? '...' : ''}
+                </div>
+              ))}
             </div>
           </div>
         )}
