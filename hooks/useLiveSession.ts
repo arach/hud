@@ -35,9 +35,9 @@ export const useLiveSession = ({ onToolCall, systemInstruction, tools }: UseLive
 
     // Connect to Gemini Live
     const connect = useCallback(async () => {
-        const apiKey = process.env.API_KEY;
+        const apiKey = localStorage.getItem('GEMINI_API_KEY');
         if (!apiKey) {
-            console.error("No API key found");
+            console.error("No API key found. Please set your Gemini API key in settings.");
             return;
         }
 
