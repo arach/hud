@@ -3,110 +3,22 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>HUD Workspace</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <title>HUD - Spatial Canvas Interface</title>
+    <meta name="description" content="A spatial canvas interface for organizing context, windows, and workflows." />
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="HUD - Spatial Canvas Interface" />
+    <meta property="og:description" content="A spatial canvas interface for organizing context, windows, and workflows." />
+    <meta property="og:image" content="/og.png" />
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="HUD - Spatial Canvas Interface" />
+    <meta name="twitter:description" content="A spatial canvas interface for organizing context, windows, and workflows." />
+    <meta name="twitter:image" content="/og.png" />
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600&display=swap" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
-    <script>
-      tailwind.config = {
-        theme: {
-          extend: {
-            fontFamily: {
-              sans: ['"JetBrains Mono"', 'monospace'],
-              mono: ['"JetBrains Mono"', 'monospace'],
-            },
-            colors: {
-              glass: {
-                100: 'rgba(0, 0, 0, 0.7)',
-                200: 'rgba(20, 20, 20, 0.7)',
-                border: 'rgba(255, 255, 255, 0.2)',
-                highlight: 'rgba(255, 255, 255, 0.1)',
-              },
-              chrome: {
-                bg: 'rgba(0, 0, 0, 0.85)',
-                border: 'rgba(38, 38, 38, 0.8)',
-                highlight: 'rgba(255, 255, 255, 0.05)',
-              }
-            },
-            spacing: {
-              'nav-top': '16px',
-              'panel-top': '72px',
-              'panel-bottom': '44px',
-              'panel-width': '280px',
-            },
-            zIndex: {
-              'manifest': '40',
-              'inspector': '40',
-              'minimap': '45',
-              'nav-stack': '50',
-              'status-bar': '60',
-              'terminal': '70',
-              'modal': '100',
-            },
-            boxShadow: {
-              'chrome': '0 0 30px rgba(0,0,0,0.8), inset 0 1px 0 rgba(255,255,255,0.05)',
-              'chrome-top': '0 5px 30px rgba(0,0,0,0.6)',
-              'chrome-bottom': '0 -5px 30px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.03)',
-            },
-          },
-        },
-      }
-    </script>
-    <style>
-      html, body, #root {
-        width: 100%;
-        height: 100%;
-        margin: 0;
-        padding: 0;
-        overflow: hidden;
-        background-color: #000000;
-        color: #ededed;
-      }
-      /* Custom Scrollbar */
-      ::-webkit-scrollbar {
-        width: 2px;
-        height: 2px;
-      }
-      ::-webkit-scrollbar-track {
-        background: #000; 
-      }
-      ::-webkit-scrollbar-thumb {
-        background: #333; 
-      }
-      /* Editor Overlay Alignment */
-      .editor-container {
-        position: relative;
-        font-family: "JetBrains Mono", monospace;
-        font-size: 10px;
-        line-height: 1.5;
-      }
-      .editor-layer {
-        position: absolute;
-        top: 0;
-        left: 0;
-        height: 100%;
-        width: 100%;
-        padding: 0.75rem; /* p-3 equivalent */
-        margin: 0;
-        border: 0;
-        box-sizing: border-box;
-        overflow: hidden;
-        white-space: pre-wrap;
-        word-break: break-all;
-      }
-      .editor-textarea {
-        z-index: 10;
-        color: transparent;
-        background: transparent;
-        caret-color: #10b981; /* Emerald 500 */
-        resize: none;
-        outline: none;
-      }
-      .editor-highlight {
-        z-index: 0;
-        pointer-events: none;
-      }
-    </style>
   <script type="importmap">
 {
   "imports": {
