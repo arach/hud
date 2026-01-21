@@ -1,9 +1,16 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useRef, useEffect } from 'react';
 import { WindowState } from '../types';
 import { ContextDef } from './ContextBar';
 import type { CanvasDebugState } from './Canvas';
-import { Check, Copy, PanelRightClose } from 'lucide-react';
+import { Check, Copy, PanelRightClose, Mic, Cpu, Activity } from 'lucide-react';
 import { PANEL_STYLES } from '../lib/hudChrome';
+
+interface Transcript {
+  role: 'user' | 'model';
+  text: string;
+  timestamp: number;
+  isFinal: boolean;
+}
 
 interface InspectorPanelProps {
   windows: WindowState[];
@@ -20,6 +27,8 @@ interface InspectorPanelProps {
   scale?: number;
   isCollapsed?: boolean;
   onToggleCollapse?: () => void;
+  isVoiceConnected?: boolean;
+  transcripts?: Transcript[];
 }
 
 const InspectorPanel: React.FC<InspectorPanelProps> = ({
@@ -36,9 +45,21 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({
   panOffset,
   scale,
   isCollapsed = false,
-  onToggleCollapse
+  onToggleCollapse,
+  isVoiceConnected = false,
+  transcripts = []
 }) => {
   const [copied, setCopied] = useState(false);
+  const chatEndRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll chat to bottom
+  useEffect(() => {
+    if (isVoiceConnected && chatEndRef.current) {
+      chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [transcripts, isVoiceConnected]);
+
+  const recentTranscripts = transcripts.slice(-4);
 
   const selectedWindow = useMemo(() => {
     if (!selectedWindowId) return null;
@@ -255,6 +276,44 @@ const InspectorPanel: React.FC<InspectorPanelProps> = ({
             )}
           </div>
         </div>
+
+        {/* Voice Chat Section */}
+        {isVoiceConnected && (
+          <div className="shrink-0 border-t border-neutral-800/50 bg-black/30 flex flex-col" style={{ maxHeight: '50%' }}>
+            <div className="shrink-0 px-4 py-2 border-b border-neutral-800/30 flex items-center gap-2">
+              <Activity size={10} className="text-emerald-500 animate-pulse" />
+              <span className="text-[9px] font-bold tracking-widest text-emerald-400 uppercase">Live Chat</span>
+            </div>
+            <div className="flex-1 overflow-y-auto p-3 space-y-2">
+              {recentTranscripts.length === 0 ? (
+                <div className="text-neutral-600 text-[10px] italic">Listening...</div>
+              ) : (
+                recentTranscripts.map((t, i) => (
+                  <div
+                    key={i}
+                    className={`
+                      relative p-2 rounded border text-[10px] leading-relaxed
+                      ${t.role === 'user'
+                        ? 'bg-neutral-900/60 border-neutral-700/50 text-neutral-300 ml-4'
+                        : 'bg-emerald-950/40 border-emerald-800/30 text-emerald-100 mr-4'
+                      }
+                    `}
+                  >
+                    <div className="absolute -top-1.5 left-2 bg-black border border-neutral-800 rounded px-1 py-0.5 text-[7px] uppercase tracking-wider text-neutral-500 flex items-center gap-0.5">
+                      {t.role === 'user' ? <Mic size={6} /> : <Cpu size={6} />}
+                      {t.role === 'user' ? 'YOU' : 'AI'}
+                    </div>
+                    <span className="opacity-90">
+                      {t.text}
+                      {!t.isFinal && <span className="inline-block w-1 h-2.5 ml-1 align-middle bg-emerald-500 animate-pulse" />}
+                    </span>
+                  </div>
+                ))
+              )}
+              <div ref={chatEndRef} />
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

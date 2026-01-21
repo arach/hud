@@ -5,7 +5,6 @@ import ChatInterface from './components/ChatInterface';
 import TaskManager from './components/TaskManager';
 import Minimap from './components/Minimap';
 import StatusBar from './components/StatusBar';
-import VoiceLog from './components/VoiceLog';
 import DraggableWindow from './components/DraggableWindow';
 import TerminalDrawer from './components/TerminalDrawer';
 
@@ -685,6 +684,8 @@ CURRENT HUD ENVIRONMENT:
                   scale={scale}
                   isCollapsed={isInspectorCollapsed}
                   onToggleCollapse={() => setIsInspectorCollapsed(prev => !prev)}
+                  isVoiceConnected={isVoiceConnected}
+                  transcripts={transcripts}
               />
             )}
 
@@ -699,12 +700,6 @@ CURRENT HUD ENVIRONMENT:
               </button>
             )}
             
-            <div className={`fixed right-8 pointer-events-none z-50 transition-all duration-300 ease-in-out flex flex-col items-end ${isTerminalOpen ? 'bottom-[340px]' : 'bottom-24'}`}>
-                  <div className="pointer-events-auto">
-                      <VoiceLog transcripts={transcripts} visible={isVoiceConnected} />
-                  </div>
-            </div>
-
             {/* Zoom Controls - floating on canvas bottom-right */}
             <ZoomControls
               scale={scale}
