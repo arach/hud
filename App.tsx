@@ -26,7 +26,6 @@ import { ViewMode } from './components/ContextDock';
 import NavigationStack from './components/NavigationStack';
 import ContextManifest from './components/ContextManifest';
 import ContextZone from './components/ContextZone';
-import SectorLocator from './components/SectorLocator';
 import InspectorPanel from './components/InspectorPanel';
 import CommandDock from './components/CommandDock';
 import ZoomControls from './components/ZoomControls';
@@ -700,18 +699,6 @@ CURRENT HUD ENVIRONMENT:
               </button>
             )}
             
-            {/* Enhanced Sector Locator */}
-            {activeView === 'spatial' && scopedWindows.length > 0 && (
-              <SectorLocator 
-                windows={scopedWindows} 
-                viewport={viewport}
-                panOffset={panOffset}
-                scale={scale}
-                onLocate={() => focusContext(activeContextId)}
-              />
-            )}
-
-
             <div className={`fixed right-8 pointer-events-none z-50 transition-all duration-300 ease-in-out flex flex-col items-end ${isTerminalOpen ? 'bottom-[340px]' : 'bottom-24'}`}>
                   <div className="pointer-events-auto">
                       <VoiceLog transcripts={transcripts} visible={isVoiceConnected} />
