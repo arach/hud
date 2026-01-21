@@ -1,43 +1,49 @@
-import React, { useState, useEffect, useCallback, useMemo, useRef, lazy, Suspense } from 'react';
-import HUDFrame from './components/HUDFrame';
-import type { CanvasDebugState } from './components/Canvas';
-import ChatInterface from './components/ChatInterface';
-import TaskManager from './components/TaskManager';
-import Minimap from './components/Minimap';
-import StatusBar from './components/StatusBar';
-import DraggableWindow from './components/DraggableWindow';
-import TerminalDrawer from './components/TerminalDrawer';
+import React, { useState, useEffect, useCallback, useMemo, useRef, Suspense } from 'react';
 
-// Lazy-loaded tool components for code splitting
-const DbSchema = lazy(() => import('./components/tools/DbSchema'));
-const ArchDiagram = lazy(() => import('./components/tools/ArchDiagram'));
-const CodeEditor = lazy(() => import('./components/tools/CodeEditor'));
-const GitGraph = lazy(() => import('./components/tools/GitGraph'));
-const DocsEditor = lazy(() => import('./components/tools/DocsEditor'));
-const UiPreview = lazy(() => import('./components/tools/UiPreview'));
-const PipelineMonitor = lazy(() => import('./components/tools/PipelineMonitor'));
-const DiffViewer = lazy(() => import('./components/tools/DiffViewer'));
-const LogViewer = lazy(() => import('./components/tools/LogViewer'));
-const SystemMonitor = lazy(() => import('./components/SystemMonitor'));
-import CommandPalette, { CommandOption } from './components/CommandPalette';
-import { ContextDef } from './components/ContextBar';
-import { ViewMode } from './components/ContextDock';
-import NavigationStack from './components/NavigationStack';
-import ContextManifest from './components/ContextManifest';
-import ContextZone from './components/ContextZone';
-import InspectorPanel from './components/InspectorPanel';
-import CommandDock from './components/CommandDock';
-import ZoomControls from './components/ZoomControls';
+// Chrome components (HUD frame/shell)
+import {
+  HUDFrame,
+  NavigationStack,
+  ContextManifest,
+  InspectorPanel,
+  StatusBar,
+  CommandDock,
+  ZoomControls,
+  type ContextDef,
+  type ViewMode
+} from './components/chrome';
+
+// Canvas components (spatial workspace)
+import {
+  DraggableWindow,
+  ContextZone,
+  type CanvasDebugState
+} from './components/canvas';
+
+// Overlay components (modals/drawers/palettes)
+import {
+  CommandPalette,
+  TerminalDrawer,
+  type CommandOption
+} from './components/overlays';
+
+// Shared components (reusable UI)
+import { ChatInterface, TaskManager } from './components/shared';
+
+// Tool registry and types
+import { getToolComponent } from './components/tools/registry';
+import type { DitherSettings } from './components/tools/DitherTool';
+import type { TextSource } from './components/tools/TextLab';
+
 import { useHud } from './contexts/HudContext';
 import { INITIAL_SYSTEM_INSTRUCTION, HUD_TOOLS } from './constants';
 import { useLiveSession } from './hooks/useLiveSession';
 import { matchesNamespace, DEFAULT_NAMESPACE_QUERY } from './lib/namespace';
 import { logPanEvent, HUD_PAN_EVENT, HudLogEntry } from './lib/hudLogger';
+import type { WindowState } from './types';
 import {
   Terminal,
   Code,
-  Database,
-  Workflow,
   Globe,
   LayoutGrid,
   Power,
@@ -76,6 +82,70 @@ const App: React.FC = () => {
   // Transition State
   const [isTransitioning, setIsTransitioning] = useState(false);
 
+  // Dither Tool State
+  const [ditherSettings, setDitherSettings] = useState<DitherSettings>({
+    pixelSize: 4,
+    palette: 'grayscale',
+    algorithm: 'ordered',
+    contrast: 1,
+    brightness: 0
+  });
+
+  // Text Lab State
+  const [textSources, setTextSources] = useState<TextSource[]>([
+    {
+      id: 'code',
+      type: 'code',
+      label: 'utils.js',
+      content: `// Utility functions for data processing
+function processData(items) {
+  const results = [];
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i];
+    if (item.active === true) {
+      if (item.value > 0) {
+        results.push({
+          id: item.id,
+          name: item.name,
+          value: item.value * 2
+        });
+      }
+    }
+  }
+  return results;
+}
+
+function formatCurrency(amount) {
+  return '$' + amount.toFixed(2);
+}
+
+function validateEmail(email) {
+  if (email.indexOf('@') > -1) {
+    return true;
+  }
+  return false;
+}`
+    },
+    {
+      id: 'email',
+      type: 'email',
+      label: 'draft.txt',
+      content: `Subject: Quick update on the project
+
+Hey team,
+
+Just wanted to give you a quick update. Things are going pretty good I think. We finished the main features yesterday and the testing is almost done.
+
+There's still some bugs we need to fix but nothing too bad. The client meeting is on Thursday so we should be ready by then hopefully.
+
+Let me know if you have any questions or whatever.
+
+Thanks,
+Alex`
+    }
+  ]);
+  const [activeTextSourceId, setActiveTextSourceId] = useState('code');
+
   // -- Consume HUD Context --
   const {
     tasks,
@@ -95,6 +165,7 @@ const App: React.FC = () => {
     setNamespaceQuery,
     updateWindow,
     closeWindow,
+    addWindow,
     restoreContextDefaults,
     selectWindow,
     focusWindow: focusWindowInContext,
@@ -371,8 +442,14 @@ const App: React.FC = () => {
     }, 350);
   }, []);
 
-  const handleZoom = useCallback((newScale: number) => {
+  const handleZoom = useCallback((newScale: number, panAdjust?: { x: number; y: number }) => {
       setScale(newScale);
+      if (panAdjust) {
+        setPanOffset(prev => ({
+          x: prev.x + panAdjust.x,
+          y: prev.y + panAdjust.y
+        }));
+      }
   }, []);
 
   const handleWindowMove = useCallback((id: string, x: number, y: number) => {
@@ -473,6 +550,81 @@ const App: React.FC = () => {
     }
   }, [tasks, sendMessage, activeView]);
 
+  // -- Dither Tool Helper --
+  const openDitherTool = useCallback(() => {
+    const existingDither = windows.find(w => w.type === 'dither');
+    if (existingDither) {
+      handleFocusWindow(existingDither.id);
+      return;
+    }
+    const newWindow: WindowState = {
+      id: `dither-${Date.now()}`,
+      title: 'Dither Lab',
+      type: 'dither',
+      x: 200 + Math.random() * 100,
+      y: 150 + Math.random() * 100,
+      w: 450,
+      h: 380,
+      zIndex: windows.length + 1,
+      contextId: activeContextId,
+      namespace: namespaceQuery,
+      tags: ['creative', 'visual']
+    };
+    addWindow(newWindow);
+    setTimeout(() => handleFocusWindow(newWindow.id), 50);
+  }, [windows, addWindow, activeContextId, namespaceQuery, handleFocusWindow]);
+
+  // -- Text Lab Helpers --
+  const openTextLab = useCallback(() => {
+    const existingLab = windows.find(w => w.type === 'textlab');
+    if (existingLab) {
+      handleFocusWindow(existingLab.id);
+      return;
+    }
+    const newWindow: WindowState = {
+      id: `textlab-${Date.now()}`,
+      title: 'Text Lab',
+      type: 'textlab',
+      x: 250 + Math.random() * 100,
+      y: 100 + Math.random() * 100,
+      w: 550,
+      h: 450,
+      zIndex: windows.length + 1,
+      contextId: activeContextId,
+      namespace: namespaceQuery,
+      tags: ['editor', 'creative']
+    };
+    addWindow(newWindow);
+    setTimeout(() => handleFocusWindow(newWindow.id), 50);
+  }, [windows, addWindow, activeContextId, namespaceQuery, handleFocusWindow]);
+
+  const handleAcceptTextChange = useCallback((sourceId: string) => {
+    setTextSources(prev => prev.map(s =>
+      s.id === sourceId && s.pendingContent
+        ? { ...s, content: s.pendingContent, pendingContent: undefined }
+        : s
+    ));
+  }, []);
+
+  const handleRejectTextChange = useCallback((sourceId: string) => {
+    setTextSources(prev => prev.map(s =>
+      s.id === sourceId ? { ...s, pendingContent: undefined } : s
+    ));
+  }, []);
+
+  const handleTextContentUpdate = useCallback((sourceId: string, content: string) => {
+    setTextSources(prev => prev.map(s =>
+      s.id === sourceId ? { ...s, content } : s
+    ));
+  }, []);
+
+  const proposeTextEdit = useCallback((sourceId: string, newContent: string) => {
+    setTextSources(prev => prev.map(s =>
+      s.id === sourceId ? { ...s, pendingContent: newContent } : s
+    ));
+    setActiveTextSourceId(sourceId);
+  }, []);
+
   // -- Chat / Voice Integration --
   const handleToolCall = useCallback(async (name: string, args: any): Promise<any> => {
       switch (name) {
@@ -533,14 +685,14 @@ const App: React.FC = () => {
                   namespace: namespaceQuery,
                   tags: []
               };
-              setWindows(prev => [...prev, newWindow]);
+              addWindow(newWindow);
               return { result: `Created ${args.type} window: ${newWindow.id}` };
           }
           case 'close_window': {
               const winId = args.windowId;
               const win = windows.find(w => w.id === winId);
               if (win) {
-                  setWindows(prev => prev.filter(w => w.id !== winId));
+                  closeWindow(winId);
                   return { result: `Closed window ${winId}` };
               }
               return { error: 'Window not found' };
@@ -555,7 +707,7 @@ const App: React.FC = () => {
               return { result: windowList };
           }
           case 'view_all': {
-              handleViewAll();
+              focusContext('global');
               return { result: 'View reset to show all windows' };
           }
           case 'create_task': {
@@ -569,10 +721,59 @@ const App: React.FC = () => {
               const res = completeTask(args.taskId);
               return { result: res };
           }
+          case 'open_dither_tool': {
+              openDitherTool();
+              return { result: 'Dither tool opened' };
+          }
+          case 'set_dither_settings': {
+              const updates: Partial<DitherSettings> = {};
+              if (args.pixelSize !== undefined) updates.pixelSize = Math.max(1, Math.min(16, args.pixelSize));
+              if (args.palette !== undefined) updates.palette = args.palette;
+              if (args.algorithm !== undefined) updates.algorithm = args.algorithm;
+              if (args.contrast !== undefined) updates.contrast = Math.max(0.5, Math.min(2, args.contrast));
+              if (args.brightness !== undefined) updates.brightness = Math.max(-0.5, Math.min(0.5, args.brightness));
+
+              setDitherSettings(prev => ({ ...prev, ...updates }));
+
+              const changedKeys = Object.keys(updates);
+              return { result: `Dither settings updated: ${changedKeys.join(', ')}` };
+          }
+          case 'open_text_lab': {
+              openTextLab();
+              return { result: 'Text Lab opened' };
+          }
+          case 'get_text': {
+              const source = textSources.find(s => s.id === args.source);
+              if (source) {
+                  return { result: { content: source.content, type: source.type, label: source.label } };
+              }
+              return { error: `Source not found: ${args.source}` };
+          }
+          case 'propose_edit': {
+              const source = textSources.find(s => s.id === args.source);
+              if (source) {
+                  proposeTextEdit(args.source, args.newContent);
+                  openTextLab(); // Make sure TextLab is visible
+                  return { result: `Proposed changes to ${source.label}. User can now review the diff and accept or reject.` };
+              }
+              return { error: `Source not found: ${args.source}` };
+          }
+          case 'apply_edit': {
+              const source = textSources.find(s => s.id === args.source);
+              if (source?.pendingContent) {
+                  handleAcceptTextChange(args.source);
+                  return { result: `Changes applied to ${source.label}` };
+              }
+              return { error: 'No pending changes to apply' };
+          }
+          case 'switch_text_source': {
+              setActiveTextSourceId(args.source);
+              return { result: `Switched to ${args.source}` };
+          }
           default:
               return { error: 'Unknown tool' };
       }
-  }, [handleContextSelect, handleFocusWindow, createTask, completeTask, windows, contexts]);
+  }, [handleContextSelect, handleFocusWindow, createTask, completeTask, windows, contexts, addWindow, closeWindow, activeContextId, namespaceQuery, focusContext, setDitherSettings, openDitherTool, openTextLab, textSources, proposeTextEdit, handleAcceptTextChange]);
 
   const systemInstruction = useMemo(() => {
      return `
@@ -607,26 +808,51 @@ CURRENT HUD ENVIRONMENT:
     </div>
   );
 
-  const renderWindowContent = (id: string) => {
-    switch(id) {
-        case 'tasks': return <TaskManager tasks={tasks} onComplete={completeTask} />;
-        case 'code': return <Suspense fallback={<ToolLoader />}><CodeEditor /></Suspense>;
-        case 'db': return <Suspense fallback={<ToolLoader />}><DbSchema /></Suspense>;
-        case 'arch': return <Suspense fallback={<ToolLoader />}><ArchDiagram /></Suspense>;
-        case 'git': return <Suspense fallback={<ToolLoader />}><GitGraph /></Suspense>;
-        case 'pipeline': return <Suspense fallback={<ToolLoader />}><PipelineMonitor /></Suspense>;
-        case 'diff': return <Suspense fallback={<ToolLoader />}><DiffViewer /></Suspense>;
-        case 'logs': return <Suspense fallback={<ToolLoader />}><LogViewer /></Suspense>;
-        case 'process': return <Suspense fallback={<ToolLoader />}><SystemMonitor /></Suspense>;
-        case 'docs': return <Suspense fallback={<ToolLoader />}><DocsEditor /></Suspense>;
-        case 'ui': return <Suspense fallback={<ToolLoader />}><UiPreview /></Suspense>;
-        default: return <div className="p-4 text-neutral-500">Module Loading...</div>;
+  const getToolProps = useCallback((win: WindowState) => {
+    const type = win.type || win.id;
+    switch (type) {
+      case 'dither':
+        return { settings: ditherSettings, onSettingsChange: setDitherSettings };
+      case 'textlab':
+        return {
+          sources: textSources,
+          activeSourceId: activeTextSourceId,
+          onSourceChange: setActiveTextSourceId,
+          onAcceptChange: handleAcceptTextChange,
+          onRejectChange: handleRejectTextChange,
+          onContentUpdate: handleTextContentUpdate
+        };
+      default:
+        return {};
     }
+  }, [ditherSettings, textSources, activeTextSourceId, handleAcceptTextChange, handleRejectTextChange, handleTextContentUpdate]);
+
+  const renderWindowContent = (win: WindowState) => {
+    const type = win.type || win.id;
+
+    // Special case: TaskManager for tasks/terminal windows
+    if (type === 'tasks' || type === 'terminal') {
+      return <TaskManager tasks={tasks} onComplete={completeTask} />;
+    }
+
+    // Use registry for all other tools
+    const Tool = getToolComponent(type);
+    if (!Tool) {
+      return <div className="p-4 text-neutral-500">Unknown module: {type}</div>;
+    }
+
+    return (
+      <Suspense fallback={<ToolLoader />}>
+        <Tool {...getToolProps(win)} />
+      </Suspense>
+    );
   };
 
   const commandList: CommandOption[] = [
     { id: 'toggle-term', label: 'Toggle Terminal', action: () => setIsTerminalOpen(p => !p), icon: <Terminal size={16} />, shortcut: 'Ctrl+`' },
     { id: 'toggle-voice', label: 'Toggle Voice Mode', action: toggleVoice, icon: <Mic size={16} /> },
+    { id: 'open-dither', label: 'Open Dither Lab', action: openDitherTool, icon: <LayoutGrid size={16} /> },
+    { id: 'open-textlab', label: 'Open Text Lab', action: openTextLab, icon: <Code size={16} /> },
     { id: 'reset', label: 'Reset Global View', action: () => { handleAutoLayout(); }, icon: <Globe size={16} />, shortcut: '⌘R' },
     { id: 'view-term', label: 'View: Terminal Grid', action: () => handleViewSelect('terminals'), icon: <Terminal size={16} /> },
     { id: 'view-code', label: 'View: Editor Grid', action: () => handleViewSelect('editors'), icon: <Code size={16} /> },
@@ -663,6 +889,19 @@ CURRENT HUD ENVIRONMENT:
     });
     return sizes;
   }, [contexts]);
+
+  // ARCHITECTURE: Chrome vs Content
+  // 
+  // CHROME (structural framework - always present):
+  // - HUDFrame, NavigationStack, ContextManifest, InspectorPanel, StatusBar, etc.
+  // - Fixed viewport positioning, provides infrastructure
+  //
+  // CONTENT (user-created instances - dynamic):
+  // - DraggableWindow components containing tool instances
+  // - World-space positioned, can be created/destroyed
+  // - Each window is an instantiation of a tool from the registry
+  //
+  // See ARCHITECTURE.md for detailed explanation.
 
   return (
     <>
@@ -864,6 +1103,8 @@ CURRENT HUD ENVIRONMENT:
               );
           })}
 
+          {/* CONTENT LAYER: User-created tool instances */}
+          {/* Each window is a dynamic content instance, not chrome */}
           {windows.map(win => {
               const renderProps = getSyntheticLayout(win, viewport, panOffset, scale);
               const activeThread = activeThreads.find(t => t.targetId === win.id && t.isActive);
@@ -899,7 +1140,7 @@ CURRENT HUD ENVIRONMENT:
                           </div>
                       </div>
                       <div className="flex-1 min-h-0 overflow-hidden relative">
-                          {renderWindowContent(win.id)}
+                          {renderWindowContent(win)}
                       </div>
                   </DraggableWindow>
               );

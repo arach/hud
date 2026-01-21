@@ -1,5 +1,5 @@
 import React from 'react';
-import { Task } from '../types';
+import { Task } from '../../types';
 import { Square, CheckSquare, Hash } from 'lucide-react';
 
 interface TaskManagerProps {

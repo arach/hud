@@ -5,7 +5,7 @@ import {
   MicOff,
   Terminal
 } from 'lucide-react';
-import { PANEL_STYLES } from '../lib/hudChrome';
+import { PANEL_STYLES } from '../../lib/hudChrome';
 
 interface CommandDockProps {
   onOpenCommandPalette: () => void;

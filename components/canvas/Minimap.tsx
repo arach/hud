@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { WindowState } from '../types';
-import { PANEL_STYLES } from '../lib/hudChrome';
+import { WindowState } from '../../types';
+import { PANEL_STYLES } from '../../lib/hudChrome';
 import { Minimize2, Maximize2, Map, Maximize } from 'lucide-react';
 
 interface MinimapProps {

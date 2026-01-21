@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Wifi, GitBranch, Activity, Clock, Mic, Terminal, Radio, Map, Maximize2, ChevronDown, Check } from 'lucide-react';
-import { PANEL_STYLES } from '../lib/hudChrome';
+import { PANEL_STYLES } from '../../lib/hudChrome';
 
 const MOCK_BRANCHES = [
   { name: 'main', isDefault: true },

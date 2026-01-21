@@ -1,9 +1,9 @@
 import React, { useMemo, useState, useRef, useEffect } from 'react';
-import { WindowState } from '../types';
+import { WindowState } from '../../types';
 import { ContextDef } from './ContextBar';
-import type { CanvasDebugState } from './Canvas';
+import type { CanvasDebugState } from '../canvas/Canvas';
 import { Check, Copy, PanelRightClose, Mic, Cpu, Activity } from 'lucide-react';
-import { PANEL_STYLES } from '../lib/hudChrome';
+import { PANEL_STYLES } from '../../lib/hudChrome';
 
 interface Transcript {
   role: 'user' | 'model';

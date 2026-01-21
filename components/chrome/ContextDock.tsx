@@ -6,7 +6,7 @@ import {
   LayoutGrid,
   MessageCircle
 } from 'lucide-react';
-import { AiThread } from '../types';
+import { AiThread } from '../../types';
 
 export type ViewMode = 'spatial' | 'terminals' | 'editors' | 'visuals';
 

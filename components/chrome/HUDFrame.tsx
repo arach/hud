@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import Canvas, { CanvasDebugState } from './Canvas';
+import Canvas, { CanvasDebugState } from '../canvas/Canvas';
 
 interface HUDFrameProps {
   children: React.ReactNode;
@@ -7,7 +7,7 @@ interface HUDFrameProps {
   panOffset: { x: number; y: number };
   scale: number;
   onPan: (delta: { x: number; y: number }) => void;
-  onZoom: (newScale: number) => void;
+  onZoom: (newScale: number, panAdjust?: { x: number; y: number }) => void;
   onPanStart?: () => void;
   onPanEnd?: () => void;
   isTransitioning?: boolean; // New prop for smooth context switching
@@ -39,12 +39,25 @@ const HUDFrame: React.FC<HUDFrameProps> = ({
         if (e.ctrlKey || e.metaKey) {
             e.preventDefault();
             // Zoom sensitivity
-            const delta = -e.deltaY * 0.001; 
+            const delta = -e.deltaY * 0.001;
             const newScale = Math.min(Math.max(0.2, scale + delta), 3);
-            onZoom(newScale);
+
+            // Zoom to cursor: adjust pan so point under cursor stays fixed
+            const centerX = window.innerWidth / 2;
+            const centerY = window.innerHeight / 2;
+            const mouseX = e.clientX;
+            const mouseY = e.clientY;
+
+            // Calculate pan adjustment to keep cursor point stationary
+            // worldX = (mouseX - centerX) / scale - panX
+            // To keep same worldX: newPanX = (mouseX - centerX) / newScale - worldX
+            const panAdjustX = (mouseX - centerX) * (1 / newScale - 1 / scale);
+            const panAdjustY = (mouseY - centerY) * (1 / newScale - 1 / scale);
+
+            onZoom(newScale, { x: panAdjustX, y: panAdjustY });
         }
     };
-    
+
     // Attach passive: false to allow preventDefault
     window.addEventListener('wheel', handleWheel, { passive: false });
     return () => window.removeEventListener('wheel', handleWheel);

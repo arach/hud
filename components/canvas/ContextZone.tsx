@@ -1,5 +1,5 @@
 import React from 'react';
-import { ContextDef } from './ContextBar';
+import { ContextDef } from '../chrome/ContextBar';
 
 interface ContextZoneProps {
   context: ContextDef;

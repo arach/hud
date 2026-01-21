@@ -1,9 +1,10 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
+import './src/index.css';
 import App from './App';
 import { HudProvider } from './contexts/HudContext';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
-import ApiKeyModal from './components/ApiKeyModal';
+import { ApiKeyModal } from './components/overlays';
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {

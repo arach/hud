@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { Message } from '../types';
+import { Message } from '../../types';
 import { Mic, Activity, ChevronRight, CornerDownLeft, Hash } from 'lucide-react';
 
 interface Transcript {

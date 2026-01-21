@@ -1,10 +1,10 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { WindowState, Task, AiThread } from '../types';
+import { WindowState, Task, AiThread } from '../../types';
 import { Check, Activity, Circle, Terminal, MousePointer2, Database, Copy, ClipboardCheck, MessageSquare, Sparkles, ChevronDown, ChevronUp, ChevronRight, Compass, TerminalSquare, FileCode, LayoutGrid, PanelLeftClose, PanelLeft, Layers } from 'lucide-react';
-import type { CanvasDebugState } from './Canvas';
-import { PANEL_STYLES } from '../lib/hudChrome';
+import type { CanvasDebugState } from '../canvas/Canvas';
+import { PANEL_STYLES } from '../../lib/hudChrome';
 import { ViewMode } from './ContextDock';
-import Minimap from './Minimap';
+import Minimap from '../canvas/Minimap';
 
 interface HudLogEntry {
   id: string;
