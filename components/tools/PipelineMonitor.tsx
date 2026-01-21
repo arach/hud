@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { CheckCircle2, Circle, Loader2, XCircle, Play, Terminal } from 'lucide-react';
 
 interface Stage {
@@ -17,7 +17,7 @@ const PipelineMonitor: React.FC = () => {
     { id: '5', name: 'Deploy to Staging', status: 'pending', duration: '-' },
   ]);
 
-  const [logs, setLogs] = useState<string[]>([
+  const logs = [
     '> docker build -t hud-agent:latest .',
     '[+] Building 2.4s (3/3) FINISHED',
     ' => [internal] load build definition from Dockerfile',
@@ -26,20 +26,11 @@ const PipelineMonitor: React.FC = () => {
     'CACHED [1/5] FROM docker.io/library/node:18@sha256:...',
     '[+] Installing dependencies...',
     'added 142 packages in 4s',
-    'running build script...'
-  ]);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-        // Simulate log streaming
-        const newLogs = [
-            `[${new Date().toISOString().split('T')[1].slice(0,8)}] Compiling modules... ${Math.floor(Math.random() * 100)}%`,
-            `[${new Date().toISOString().split('T')[1].slice(0,8)}] Optimizing chunks...`
-        ];
-        setLogs(prev => [...prev.slice(-15), newLogs[Math.floor(Math.random() * 2)]]);
-    }, 2000);
-    return () => clearInterval(interval);
-  }, []);
+    'running build script...',
+    '[12:34:56] Compiling modules... 100%',
+    '[12:34:58] Optimizing chunks...',
+    '[12:35:01] Build complete.'
+  ];
 
   const getIcon = (status: Stage['status']) => {
     switch (status) {
