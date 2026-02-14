@@ -119,8 +119,8 @@ const DraggableWindow: React.FC<DraggableWindowProps> = ({
 
   return (
     <div 
-      style={{ 
-        left: worldX, 
+      style={{
+        left: worldX,
         top: worldY,
         width: w,
         height: h,
@@ -128,10 +128,15 @@ const DraggableWindow: React.FC<DraggableWindowProps> = ({
         position: 'absolute',
         touchAction: 'none',
         // Visual styling for dimmed state
-        opacity: isDimmed ? 0.3 : 1,
-        filter: isDimmed ? 'grayscale(100%) blur(1px)' : 'none',
-        transition: 'all 0.5s cubic-bezier(0.2, 0.8, 0.2, 1)', // Smooth transition for layout changes
-        pointerEvents: isDimmed ? 'none' : 'auto' 
+        opacity: isDimmed ? 0.25 : 1,
+        filter: isDimmed ? 'grayscale(100%) blur(1.5px)' : 'none',
+        boxShadow: isDimmed
+          ? 'none'
+          : isSelected
+            ? '0 0 40px rgba(16,185,129,0.08), 0 0 12px rgba(16,185,129,0.05), 0 8px 32px rgba(0,0,0,0.7)'
+            : '0 0 25px rgba(255,255,255,0.025), 0 8px 32px rgba(0,0,0,0.6)',
+        transition: 'all 0.5s cubic-bezier(0.2, 0.8, 0.2, 1)',
+        pointerEvents: isDimmed ? 'none' : 'auto'
       }}
       className={`
         flex flex-col animate-in zoom-in-95 duration-300
@@ -141,10 +146,10 @@ const DraggableWindow: React.FC<DraggableWindowProps> = ({
       onMouseDown={handleContentMouseDown} 
     >
       {/* Selection Border / Glow */}
-      <div className={`absolute -inset-[3px] pointer-events-none transition-opacity duration-300 ${isSelected && !isDimmed ? 'opacity-100' : 'opacity-0'}`}>
-         <div className={`absolute inset-0 border shadow-[0_0_30px_rgba(16,185,129,0.2)] animate-pulse rounded-sm ${isDragDisabled ? 'border-blue-500/40' : 'border-emerald-500/40'}`}></div>
-         
-         {/* Tech Corners - Change color based on mode */}
+      <div className={`absolute -inset-[3px] pointer-events-none transition-all duration-300 ${isSelected && !isDimmed ? 'opacity-100' : 'opacity-0'}`}>
+         <div className={`absolute inset-0 border rounded-sm ${isDragDisabled ? 'border-blue-500/50 shadow-[0_0_40px_rgba(59,130,246,0.25)]' : 'border-emerald-500/50 shadow-[0_0_40px_rgba(16,185,129,0.25)]'}`}></div>
+
+         {/* Tech Corners */}
          <div className={`absolute top-0 left-0 w-3 h-3 border-t-2 border-l-2 ${isDragDisabled ? 'border-blue-400' : 'border-emerald-400'}`}></div>
          <div className={`absolute top-0 right-0 w-3 h-3 border-t-2 border-r-2 ${isDragDisabled ? 'border-blue-400' : 'border-emerald-400'}`}></div>
          <div className={`absolute bottom-0 left-0 w-3 h-3 border-b-2 border-l-2 ${isDragDisabled ? 'border-blue-400' : 'border-emerald-400'}`}></div>

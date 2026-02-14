@@ -94,11 +94,7 @@ const DEFAULT_WINDOWS: WindowState[] = [
   { id: 'diff', contextId: 'studio', namespace: buildNamespace('studio', 'editor', 'diff'), type: 'editor', title: 'Diff Viewer', ...layout(WORKSPACE_ORIGINS.studio, 820, 0, 400, 720), zIndex: 10 },
 ];
 
-const INITIAL_THREADS: AiThread[] = [
-  { id: 't1', targetId: 'code', topic: 'Refactoring API', messageCount: 3, isActive: true },
-  { id: 't2', targetId: 'pipeline', topic: 'Fixing Build Fail', messageCount: 5, isActive: true },
-  { id: 't3', targetId: 'db', topic: 'Schema Migration', messageCount: 1, isActive: true },
-];
+const INITIAL_THREADS: AiThread[] = [];
 
 // --- TYPES ---
 

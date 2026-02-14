@@ -9,6 +9,7 @@ import {
   StatusBar,
   CommandDock,
   ZoomControls,
+  VoiceControl,
   type ContextDef,
   type ViewMode
 } from './components/chrome';
@@ -1164,6 +1165,12 @@ CURRENT HUD ENVIRONMENT:
               onZoomOut={() => setScale(s => Math.max(0.2, s - 0.2))}
             />
 
+            {/* Voice Control - floating on canvas top-right */}
+            <VoiceControl
+              isConnected={isVoiceConnected}
+              onToggle={toggleVoice}
+            />
+
             {!isCompactMode && (
               <CommandDock
                   onOpenCommandPalette={() => { pop(); setIsCmdPaletteOpen(true); }}
@@ -1286,10 +1293,10 @@ CURRENT HUD ENVIRONMENT:
                       onResize={handleWindowResize}
                       onSelect={handleWindowSelect}
                       onClose={closeWindow}
-                      className={'bg-black border border-neutral-700 shadow-2xl flex flex-col'}
+                      className={'bg-[#0a0a0a] border border-neutral-600 backdrop-blur-md ring-1 ring-white/[0.04] flex flex-col'}
                   >
-                      <div className="h-6 bg-neutral-900 border-b border-neutral-800 flex items-center justify-center px-2 select-none shrink-0 relative">
-                          <span className="text-[10px] font-bold tracking-widest text-neutral-500 uppercase">{win.title}</span>
+                      <div className="h-7 bg-neutral-900/90 border-b border-neutral-700 flex items-center justify-center px-2 select-none shrink-0 relative">
+                          <span className="text-[10px] font-bold tracking-widest text-neutral-400 uppercase">{win.title}</span>
                           <div className="absolute right-2 flex gap-1 group">
                               <div 
                                 onClick={(e) => { e.stopPropagation(); blipDown(); closeWindow(win.id); }}

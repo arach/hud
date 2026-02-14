@@ -11,3 +11,4 @@ export { default as InspectorPanel } from './InspectorPanel';
 export { default as StatusBar } from './StatusBar';
 export { default as CommandDock } from './CommandDock';
 export { default as ZoomControls } from './ZoomControls';
+export { default as VoiceControl } from './VoiceControl';

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Globe, Search, X } from 'lucide-react';
+import { Search, X } from 'lucide-react';
 import { ContextDef } from './ContextBar';
 
 interface NavigationStackProps {
@@ -32,21 +32,25 @@ const NavigationStack: React.FC<NavigationStackProps> = ({
         {/* Top highlight line */}
         <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-white/5 to-transparent" />
 
-        {/* LEFT: Home/Globe - Reset to Global */}
-        <div className="flex items-center shrink-0">
-          <button
-            onClick={onResetToGlobal}
-            className={`
-              flex items-center justify-center w-8 h-8 rounded-lg transition-all duration-200
-              ${activeContextId === 'global'
-                ? 'bg-white/10 text-white'
-                : 'text-neutral-500 hover:text-white hover:bg-white/5'}
-            `}
-            title="Reset to Global View"
+        {/* LEFT: Branding */}
+        <button
+          onClick={onResetToGlobal}
+          className="group flex items-baseline gap-0 shrink-0 select-none cursor-pointer bg-transparent border-none"
+          title="Reset to Global View"
+        >
+          <span className="text-[22px] font-bold text-white tracking-[0.25em] font-mono leading-none">
+            HUD
+          </span>
+          <span
+            className="flex items-baseline gap-2.5 overflow-hidden max-w-0 group-hover:max-w-[160px] transition-all duration-500 ease-out opacity-0 group-hover:opacity-100"
+            style={{ fontFamily: "'Instrument Serif', serif" }}
           >
-            <Globe size={18} />
-          </button>
-        </div>
+            <span className="ml-3">
+              <em className="text-[12px] text-neutral-500">by</em>
+            </span>
+            <em className="text-[17px] text-white leading-none whitespace-nowrap">@arach</em>
+          </span>
+        </button>
 
         {/* Divider */}
         <div className="w-px h-6 bg-neutral-800 mx-4" />
@@ -83,15 +87,15 @@ const NavigationStack: React.FC<NavigationStackProps> = ({
 
         {/* RIGHT: Scope Filter - matches Inspector panel width */}
         <div className="absolute right-0 top-0 bottom-0 w-[280px] flex items-center px-4">
-          <div className="relative flex-1">
-            <Search size={12} className="absolute left-0 top-1/2 -translate-y-1/2 text-neutral-500" />
+          <div className="relative flex-1 bg-white/[0.03] border border-neutral-700/50 rounded-md px-2.5 hover:border-neutral-600/60 focus-within:border-neutral-500/50 focus-within:bg-white/[0.05] transition-all duration-200">
+            <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-neutral-500" />
             <input
               type="text"
               value={namespaceQuery}
               onChange={(e) => onNamespaceQueryChange(e.target.value)}
               placeholder="Scope filter..."
               className={`
-                w-full h-8 pl-5 pr-8 bg-transparent text-[11px] font-mono
+                w-full h-7 pl-5 pr-6 bg-transparent text-[11px] font-mono
                 placeholder:text-neutral-600 text-neutral-300
                 focus:outline-none
                 transition-all duration-200
@@ -101,7 +105,7 @@ const NavigationStack: React.FC<NavigationStackProps> = ({
             {isFiltered && (
               <button
                 onClick={() => onNamespaceQueryChange('**')}
-                className="absolute right-0 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-white transition-colors"
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-white transition-colors"
               >
                 <X size={12} />
               </button>
