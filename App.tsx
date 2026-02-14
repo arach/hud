@@ -24,6 +24,7 @@ import {
 import {
   CommandPalette,
   TerminalDrawer,
+  WelcomeModal,
   type CommandOption
 } from './components/overlays';
 
@@ -40,6 +41,7 @@ import { INITIAL_SYSTEM_INSTRUCTION, HUD_TOOLS } from './constants';
 import { useLiveSession } from './hooks/useLiveSession';
 import { matchesNamespace, DEFAULT_NAMESPACE_QUERY } from './lib/namespace';
 import { logPanEvent, HUD_PAN_EVENT, HudLogEntry } from './lib/hudLogger';
+import { thock, blipDown, whoosh, pop, slideIn, slideOut, click, sounds, preview, isMuted, setMuted, type SoundName } from './lib/sounds';
 import type { WindowState } from './types';
 import {
   Terminal,
@@ -71,6 +73,7 @@ const App: React.FC = () => {
   const [isPanSettling, setIsPanSettling] = useState(false);
   const [pendingContextFocusId, setPendingContextFocusId] = useState<string | null>(null);
   const [isOverviewMode, setIsOverviewMode] = useState(true); // Start in overview mode
+  const [showWelcome, setShowWelcome] = useState(() => !localStorage.getItem('hud_welcomed'));
   const [hudLogs, setHudLogs] = useState<HudLogEntry[]>([]);
   const [canvasDebug, setCanvasDebug] = useState<CanvasDebugState | null>(null);
   const canvasDebugRef = useRef<CanvasDebugState | null>(null);
@@ -173,7 +176,8 @@ Alex`
     focusWindow: focusWindowInContext,
     resetLayout,
     checkAuth,
-    getSyntheticLayout
+    getSyntheticLayout,
+    addLocalMessage
   } = useHud();
 
   // Context zone sizes (used by findNearestContext and other components)
@@ -197,11 +201,15 @@ Alex`
     const handleKeyDown = (e: KeyboardEvent) => {
         if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
             e.preventDefault();
+            pop();
             setIsCmdPaletteOpen(prev => !prev);
         }
         if (e.ctrlKey && e.key === '`') {
             e.preventDefault();
-            setIsTerminalOpen(prev => !prev);
+            setIsTerminalOpen(prev => {
+              if (prev) slideOut(); else slideIn();
+              return !prev;
+            });
         }
     };
 
@@ -525,6 +533,7 @@ Alex`
   }, [updateWindow, activeView]);
 
   const handleWindowSelect = useCallback((id: string) => {
+    thock();
     setSelectedWindowId(id);
     setSelectedContextId(null);
     setSelectedFilter(null);
@@ -536,6 +545,7 @@ Alex`
   }, [setPanOffsetWithLog]);
 
   const handleContextSelect = useCallback((ctx: ContextDef) => {
+      whoosh();
       setIsOverviewMode(false); // Exit overview mode when selecting a context
       setActiveView('spatial');
       setActiveContextId(ctx.id);
@@ -565,10 +575,11 @@ Alex`
   }, [resetLayout, focusContext]);
 
   const handleFocusWindow = useCallback((id: string) => {
+      thock();
       setSelectedWindowId(id);
       setSelectedContextId(null);
       setSelectedFilter(null);
-      
+
       if (id === 'terminal') {
           setIsTerminalOpen(true);
           return;
@@ -609,6 +620,7 @@ Alex`
   }, []);
 
   const handleViewSelect = useCallback((view: ViewMode) => {
+      click();
       setActiveView(view);
       setSelectedFilter({ kind: 'view', id: view });
       setSelectedWindowId(null);
@@ -860,7 +872,7 @@ CURRENT HUD ENVIRONMENT:
 `;
   }, [activeView, namespaceQuery]);
 
-  const { connect: connectVoice, disconnect: disconnectVoice, isConnected: isVoiceConnected, transcripts } = useLiveSession({
+  const { connect: connectVoice, disconnect: disconnectVoice, isConnected: isVoiceConnected, transcripts, sendText: sendVoiceText } = useLiveSession({
     onToolCall: handleToolCall,
     systemInstruction,
     tools: HUD_TOOLS
@@ -872,7 +884,82 @@ CURRENT HUD ENVIRONMENT:
       else connectVoice();
   };
 
+  // Auto-connect voice after API key activation, then greet
+  useEffect(() => {
+    const handler = () => {
+      setTimeout(async () => {
+        await connectVoice();
+        // Give the session a moment to fully open, then prompt a welcome
+        setTimeout(() => {
+          sendVoiceText('You just activated for the first time. Say a brief, warm welcome to HUD — keep it short and natural, one sentence.');
+        }, 2000);
+      }, 300);
+    };
+    window.addEventListener('hud:voice-activate', handler);
+    return () => window.removeEventListener('hud:voice-activate', handler);
+  }, [connectVoice, sendVoiceText]);
+
+  const soundNames = Object.keys(sounds) as SoundName[];
+
   const handleTextSendMessage = (text: string) => {
+      const trimmed = text.trim().toLowerCase();
+
+      // /sounds — list all sounds
+      if (trimmed === '/sounds' || trimmed === '/sound') {
+        addLocalMessage('user', text);
+        const muteState = isMuted() ? 'MUTED' : 'UNMUTED';
+        const listing = soundNames.map(name => {
+          const descs: Record<SoundName, string> = {
+            click: 'button press, toggle',
+            thock: 'window focus, panel open',
+            blipUp: 'task complete, success',
+            blipDown: 'dismiss, close, undo',
+            pop: 'tooltip, hover reveal',
+            confirm: 'save, commit',
+            error: 'validation fail',
+            whoosh: 'context switch, transition',
+            chime: 'activation, welcome',
+            tick: 'checkbox, step progress',
+            slideIn: 'drawer open, expand',
+            slideOut: 'drawer close, collapse',
+            boot: 'system init',
+            ping: 'notification, alert',
+            type: 'keyboard keystroke',
+          };
+          return `  /sounds play ${name.padEnd(10)} — ${descs[name]}`;
+        }).join('\n');
+        addLocalMessage('system', `SOUND_ENGINE [${muteState}]\n\n${listing}\n\n  /sounds play <name>    preview a sound\n  /sounds on             unmute sounds\n  /sounds off            mute sounds`);
+        return;
+      }
+
+      // /sounds play <name> — preview a sound
+      const playMatch = trimmed.match(/^\/sounds?\s+play\s+(\w+)$/);
+      if (playMatch) {
+        const name = playMatch[1] as SoundName;
+        addLocalMessage('user', text);
+        if (name in sounds) {
+          preview(name);
+          addLocalMessage('system', `▶ ${name}`);
+        } else {
+          addLocalMessage('system', `Unknown sound: ${name}\nAvailable: ${soundNames.join(', ')}`);
+        }
+        return;
+      }
+
+      // /sounds on|off — mute toggle
+      if (trimmed === '/sounds on') {
+        addLocalMessage('user', text);
+        setMuted(false);
+        addLocalMessage('system', 'SOUND_ENGINE UNMUTED — UI sounds are now active');
+        return;
+      }
+      if (trimmed === '/sounds off') {
+        addLocalMessage('user', text);
+        setMuted(true);
+        addLocalMessage('system', 'SOUND_ENGINE MUTED');
+        return;
+      }
+
       const viewScope = activeView !== 'spatial' ? ` | ${activeView.toUpperCase()}` : '';
       const scope = `${namespaceQuery}${viewScope}`;
       sendMessage(text, scope);
@@ -1023,6 +1110,7 @@ CURRENT HUD ENVIRONMENT:
                     focusContext('global');
                     setIsOverviewMode(true);
                   }}
+                  onOpenWelcome={() => setShowWelcome(true)}
               />
             )}
 
@@ -1078,9 +1166,9 @@ CURRENT HUD ENVIRONMENT:
 
             {!isCompactMode && (
               <CommandDock
-                  onOpenCommandPalette={() => setIsCmdPaletteOpen(true)}
+                  onOpenCommandPalette={() => { pop(); setIsCmdPaletteOpen(true); }}
                   onToggleVoice={toggleVoice}
-                  onToggleTerminal={() => setIsTerminalOpen(p => !p)}
+                  onToggleTerminal={() => setIsTerminalOpen(p => { if (p) slideOut(); else slideIn(); return !p; })}
                   isVoiceConnected={isVoiceConnected}
                   isTerminalOpen={isTerminalOpen}
               />
@@ -1088,7 +1176,7 @@ CURRENT HUD ENVIRONMENT:
 
             <TerminalDrawer 
                 isOpen={isTerminalOpen} 
-                onClose={() => setIsTerminalOpen(false)}
+                onClose={() => { slideOut(); setIsTerminalOpen(false); }}
                 onToggleMaximize={() => setIsTerminalMaximized(p => !p)}
                 isMaximized={isTerminalMaximized}
                 activeContextLabel={contexts.find(c => c.id === activeContextId)?.label}
@@ -1119,10 +1207,15 @@ CURRENT HUD ENVIRONMENT:
                 onToggleMinimap={() => setIsMinimapCollapsed(prev => !prev)}
             />
 
-            <CommandPalette 
-                isOpen={isCmdPaletteOpen} 
-                onClose={() => setIsCmdPaletteOpen(false)} 
-                commands={commandList} 
+            <CommandPalette
+                isOpen={isCmdPaletteOpen}
+                onClose={() => setIsCmdPaletteOpen(false)}
+                commands={commandList}
+            />
+
+            <WelcomeModal
+                isOpen={showWelcome}
+                onClose={() => setShowWelcome(false)}
             />
 
             {isScopeEmpty && (
@@ -1199,7 +1292,7 @@ CURRENT HUD ENVIRONMENT:
                           <span className="text-[10px] font-bold tracking-widest text-neutral-500 uppercase">{win.title}</span>
                           <div className="absolute right-2 flex gap-1 group">
                               <div 
-                                onClick={(e) => { e.stopPropagation(); closeWindow(win.id); }}
+                                onClick={(e) => { e.stopPropagation(); blipDown(); closeWindow(win.id); }}
                                 className="w-1.5 h-1.5 rounded-full bg-neutral-700 hover:bg-red-500 transition-colors cursor-pointer"
                                 title="Close Window"
                               ></div>

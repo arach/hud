@@ -279,12 +279,22 @@ export const useLiveSession = ({ onToolCall, systemInstruction, tools }: UseLive
         return buffer;
     }
 
+    const sendText = useCallback((text: string) => {
+        sessionPromiseRef.current?.then(session => {
+            session.sendClientContent({
+                turns: [{ role: 'user', parts: [{ text }] }],
+                turnComplete: true
+            });
+        });
+    }, []);
+
     return {
         connect,
         disconnect,
         isConnected,
         isTalking,
         volume,
-        transcripts
+        transcripts,
+        sendText
     };
 };

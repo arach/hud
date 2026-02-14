@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { WindowState, Task, AiThread } from '../../types';
-import { Check, Activity, Circle, Terminal, MousePointer2, Database, Copy, ClipboardCheck, MessageSquare, Sparkles, ChevronDown, ChevronUp, ChevronRight, Compass, TerminalSquare, FileCode, LayoutGrid, PanelLeftClose, PanelLeft, Layers } from 'lucide-react';
+import { Check, Activity, Circle, Terminal, MousePointer2, Database, Copy, ClipboardCheck, MessageSquare, Sparkles, ChevronDown, ChevronUp, ChevronRight, Compass, TerminalSquare, FileCode, LayoutGrid, PanelLeftClose, PanelLeft, Layers, Radio, Mic, Search, Key, ExternalLink } from 'lucide-react';
 import type { CanvasDebugState } from '../canvas/Canvas';
 import { PANEL_STYLES } from '../../lib/hudChrome';
 import { ViewMode } from './ContextDock';
@@ -44,6 +44,7 @@ interface ContextManifestProps {
   viewport?: { width: number; height: number };
   onNavigate?: (x: number, y: number) => void;
   onViewAll?: () => void;
+  onOpenWelcome?: () => void;
 }
 
 interface LogItem {
@@ -107,7 +108,8 @@ const ContextManifest: React.FC<ContextManifestProps> = ({
   onToggleCollapse,
   viewport,
   onNavigate,
-  onViewAll
+  onViewAll,
+  onOpenWelcome
 }) => {
   const [logs, setLogs] = useState<LogItem[]>([]);
   const [headerText, setHeaderText] = useState('');
@@ -121,6 +123,8 @@ const ContextManifest: React.FC<ContextManifestProps> = ({
   const [viewModesExpanded, setViewModesExpanded] = useState(true);
   const [modulesExpanded, setModulesExpanded] = useState(true);
   const [minimapExpanded, setMinimapExpanded] = useState(true);
+  const [commsExpanded, setCommsExpanded] = useState(true);
+  const [voiceExpanded, setVoiceExpanded] = useState(false);
   
   const logsRef = useRef(logs);
   const windowsRef = useRef(windows);
@@ -443,6 +447,96 @@ const ContextManifest: React.FC<ContextManifestProps> = ({
                   )}
               </div>
           </div>
+        </div>
+
+        {/* CENTRALCOMS Section - Collapsible */}
+        <div className="shrink-0 border-b border-neutral-800/50">
+          <div className="w-full px-3 py-2 flex items-center justify-between text-neutral-400">
+            <div className="flex items-center gap-2">
+              <button
+                onClick={onOpenWelcome}
+                className="hover:text-white transition-colors"
+                title="Open welcome guide"
+              >
+                <Radio size={12} className={commsExpanded ? 'text-emerald-400 hover:text-emerald-300' : 'text-neutral-500 hover:text-white'} />
+              </button>
+              <button
+                onClick={() => setCommsExpanded(!commsExpanded)}
+                className="flex items-center gap-2 hover:bg-white/5 transition-colors rounded px-1 -mx-1"
+              >
+                <span className="text-[9px] tracking-widest font-bold">CENTRALCOMS</span>
+              </button>
+            </div>
+            <button
+              onClick={() => setCommsExpanded(!commsExpanded)}
+              className="hover:bg-white/5 rounded p-0.5 transition-colors"
+            >
+              {commsExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+            </button>
+          </div>
+
+          {commsExpanded && (
+            <div className="px-3 pb-3">
+              <div className="text-[10px] text-neutral-500 mb-2 leading-relaxed">
+                <span className="text-neutral-400">Built by arach</span>
+                <br />
+                Spatial canvas for organizing context, windows &amp; workflows
+              </div>
+              <div className="flex flex-col gap-1">
+                {/* VOICE_MODE - expandable accordion */}
+                <div>
+                  <button
+                    onClick={() => setVoiceExpanded(!voiceExpanded)}
+                    className="w-full flex items-center gap-2 px-1.5 py-1 rounded hover:bg-white/5 transition-colors"
+                  >
+                    <Mic size={12} className="text-emerald-500 shrink-0" />
+                    <span className="text-[10px] text-neutral-400 font-bold tracking-wide flex-1 text-left">VOICE_MODE</span>
+                    <span className="text-[10px] text-neutral-600 mr-1">bottom-right</span>
+                    <ChevronRight size={10} className={`text-neutral-600 transition-transform duration-150 ${voiceExpanded ? 'rotate-90' : ''}`} />
+                  </button>
+                  {voiceExpanded && (
+                    <div className="ml-5 mt-1 mb-1 pl-2 border-l border-neutral-800">
+                      <p className="text-[9px] text-neutral-500 leading-relaxed mb-2">
+                        Voice mode uses the <span className="text-neutral-300">Gemini Live API</span> for real-time voice interaction. HUD has no backend &mdash; your key stays in your browser and calls go directly to Google.
+                      </p>
+                      <div className="flex items-center gap-2 mb-2">
+                        <Key size={10} className="text-neutral-600" />
+                        <span className="text-[9px] text-neutral-500">
+                          {localStorage.getItem('GEMINI_API_KEY')
+                            ? <span className="text-emerald-500">Key configured</span>
+                            : <span className="text-amber-500">No key set</span>
+                          }
+                        </span>
+                      </div>
+                      <a
+                        href="https://aistudio.google.com/apikey"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 text-[9px] text-emerald-600 hover:text-emerald-400 transition-colors"
+                      >
+                        <ExternalLink size={9} />
+                        Get a Gemini API key
+                      </a>
+                    </div>
+                  )}
+                </div>
+
+                {/* CONSOLE */}
+                <div className="flex items-center gap-2 px-1.5 py-1 rounded hover:bg-white/5 transition-colors">
+                  <Terminal size={12} className="text-emerald-500 shrink-0" />
+                  <span className="text-[10px] text-neutral-400 font-bold tracking-wide flex-1">CONSOLE</span>
+                  <span className="text-[10px] text-neutral-600">Ctrl + `</span>
+                </div>
+
+                {/* CMD_PALETTE */}
+                <div className="flex items-center gap-2 px-1.5 py-1 rounded hover:bg-white/5 transition-colors">
+                  <Search size={12} className="text-emerald-500 shrink-0" />
+                  <span className="text-[10px] text-neutral-400 font-bold tracking-wide flex-1">CMD_PALETTE</span>
+                  <span className="text-[10px] text-neutral-600">{'\u2318K'}</span>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* View Modes Section - Collapsible */}

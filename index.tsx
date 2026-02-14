@@ -14,7 +14,13 @@ if (!rootElement) {
 // Internal component to consume Auth Context
 const SystemOverlay = () => {
     const { isModalOpen, saveKey } = useAuth();
-    return <ApiKeyModal isOpen={isModalOpen} onSave={saveKey} />;
+    return (
+      <ApiKeyModal
+        isOpen={isModalOpen}
+        onSave={saveKey}
+        onActivated={() => window.dispatchEvent(new CustomEvent('hud:voice-activate'))}
+      />
+    );
 };
 
 const root = ReactDOM.createRoot(rootElement);

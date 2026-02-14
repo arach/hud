@@ -2,3 +2,4 @@
 export { default as CommandPalette, type CommandOption } from './CommandPalette';
 export { default as TerminalDrawer } from './TerminalDrawer';
 export { default as ApiKeyModal } from './ApiKeyModal';
+export { default as WelcomeModal } from './WelcomeModal';

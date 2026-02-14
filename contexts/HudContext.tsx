@@ -129,6 +129,7 @@ interface HudContextType {
 
   // Actions
   sendMessage: (text: string, scope?: string) => Promise<void>;
+  addLocalMessage: (role: 'user' | 'model' | 'system', content: string) => void;
   createTask: (partial: Partial<Task>) => string;
   completeTask: (id: string) => string;
   
@@ -261,6 +262,15 @@ export const HudProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setIsProcessing(false);
     }
   }, [tasks, createTask, completeTask, checkAuth, setMessages]);
+
+  const addLocalMessage = useCallback((role: 'user' | 'model' | 'system', content: string) => {
+    setMessages(prev => [...prev, {
+      id: `local-${Date.now()}`,
+      role,
+      content,
+      timestamp: Date.now()
+    }]);
+  }, [setMessages]);
 
   // -- Window & UI Actions --
 
@@ -416,6 +426,7 @@ export const HudProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       isProcessing,
       contexts: CONTEXTS,
       sendMessage,
+      addLocalMessage,
       createTask,
       completeTask,
       setActiveContextId,
