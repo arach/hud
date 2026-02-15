@@ -1019,6 +1019,50 @@ CURRENT HUD ENVIRONMENT:
   const renderWindowContent = (win: WindowState) => {
     const type = win.type || win.id;
 
+    // Special case: Index navigation card
+    if (type === 'index') {
+      return (
+        <div className="flex flex-col h-full overflow-auto p-4 gap-3">
+          <div className="text-[10px] text-neutral-500 tracking-widest uppercase font-mono">Workspaces</div>
+          {contexts.filter(c => c.id !== 'global').map(ctx => {
+            const ctxWindows = windows.filter(w => w.contextId === ctx.id);
+            return (
+              <button
+                key={ctx.id}
+                onClick={() => handleContextSelect(ctx)}
+                className="text-left group"
+              >
+                <div className="flex items-center gap-2 mb-1">
+                  <div className="w-1.5 h-1.5 rounded-full" style={{ background: ctx.color }} />
+                  <span className="text-[11px] font-bold tracking-widest uppercase group-hover:text-white transition-colors" style={{ color: ctx.color }}>
+                    {ctx.label}
+                  </span>
+                  <span className="text-[9px] text-neutral-600 font-mono">{ctxWindows.length}</span>
+                </div>
+                <div className="pl-3.5 flex flex-col gap-0.5">
+                  {ctxWindows.map(w => (
+                    <div
+                      key={w.id}
+                      onClick={(e) => { e.stopPropagation(); handleFocusWindow(w.id); }}
+                      className="text-[10px] text-neutral-500 hover:text-white transition-colors cursor-pointer py-0.5 flex items-center gap-2"
+                    >
+                      <span className="w-1 h-1 rounded-full bg-neutral-700" />
+                      {w.title}
+                    </div>
+                  ))}
+                </div>
+              </button>
+            );
+          })}
+          <div className="mt-auto pt-3 border-t border-neutral-800/50">
+            <div className="text-[9px] text-neutral-600 font-mono leading-relaxed">
+              {windows.length} modules · {contexts.filter(c => c.id !== 'global').length} zones
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     // Special case: TaskManager for tasks/terminal windows
     if (type === 'tasks' || type === 'terminal') {
       return <TaskManager tasks={tasks} onComplete={completeTask} />;

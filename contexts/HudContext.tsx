@@ -92,6 +92,9 @@ const DEFAULT_WINDOWS: WindowState[] = [
   // VISUAL STUDIO
   { id: 'ui', contextId: 'studio', namespace: buildNamespace('studio', 'visual', 'ui'), type: 'visual', title: 'UI Preview', ...layout(WORKSPACE_ORIGINS.studio, 0, 0, 800, 720), zIndex: 11 },
   { id: 'diff', contextId: 'studio', namespace: buildNamespace('studio', 'editor', 'diff'), type: 'editor', title: 'Diff Viewer', ...layout(WORKSPACE_ORIGINS.studio, 820, 0, 400, 720), zIndex: 10 },
+
+  // INDEX — centered between all 4 zones
+  { id: 'index', contextId: 'global', namespace: 'hud.index', type: 'index', title: 'Index', x: 1400, y: 1050, w: 340, h: 420, zIndex: 50 },
 ];
 
 const INITIAL_THREADS: AiThread[] = [];

@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { WindowState, Task, AiThread } from '../../types';
-import { Check, Activity, Circle, Terminal, MousePointer2, Database, Copy, ClipboardCheck, MessageSquare, Sparkles, ChevronDown, ChevronUp, ChevronRight, Compass, TerminalSquare, FileCode, LayoutGrid, PanelLeftClose, PanelLeft, Layers, Radio, Mic, Search, Key, ExternalLink } from 'lucide-react';
+import { Check, Activity, Circle, Terminal, MousePointer2, Database, Copy, ClipboardCheck, MessageSquare, Sparkles, ChevronDown, ChevronUp, ChevronRight, Compass, TerminalSquare, FileCode, LayoutGrid, PanelLeftClose, PanelLeft, Layers, Radio, Mic, Search, Key, ExternalLink, Box, Eye } from 'lucide-react';
 import type { CanvasDebugState } from '../canvas/Canvas';
 import { PANEL_STYLES } from '../../lib/hudChrome';
 import { ViewMode } from './ContextDock';
@@ -120,11 +120,25 @@ const ContextManifest: React.FC<ContextManifestProps> = ({
   const [canvasCopySuccess, setCanvasCopySuccess] = useState(false);
 
   // Collapsible section states
-  const [viewModesExpanded, setViewModesExpanded] = useState(true);
-  const [modulesExpanded, setModulesExpanded] = useState(true);
+  const [viewModesExpanded, setViewModesExpanded] = useState(false);
+  const [modulesExpanded, setModulesExpanded] = useState(false);
+  const [windowsExpanded, setWindowsExpanded] = useState(false);
   const [minimapExpanded, setMinimapExpanded] = useState(true);
   const [commsExpanded, setCommsExpanded] = useState(true);
   const [voiceExpanded, setVoiceExpanded] = useState(false);
+
+  // Auto-collapse CENTRALCOMS after initial display
+  useEffect(() => {
+    const timer = setTimeout(() => setCommsExpanded(false), 4000);
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Auto-expand windows list when a window is selected
+  useEffect(() => {
+    if (selectedWindowId) {
+      setWindowsExpanded(true);
+    }
+  }, [selectedWindowId]);
   
   const logsRef = useRef(logs);
   const windowsRef = useRef(windows);
@@ -555,25 +569,50 @@ const ContextManifest: React.FC<ContextManifestProps> = ({
 
           {viewModesExpanded && (
             <div className="px-3 pb-3">
-              <div className="flex flex-col gap-1">
+              <div className="flex flex-col gap-0.5">
+                {/* Spatial — top-level */}
+                <button
+                  onClick={() => onSelectView('spatial')}
+                  className={`
+                    flex items-center gap-3 px-3 py-2 rounded-lg text-[11px] font-bold tracking-wide transition-all duration-200 w-full text-left
+                    ${activeView === 'spatial'
+                      ? 'bg-white/10 text-white'
+                      : 'text-neutral-500 hover:text-white hover:bg-white/5'}
+                  `}
+                >
+                  <span className="w-5 h-5 flex items-center justify-center rounded" style={{ color: activeView === 'spatial' ? '#ffffff' : undefined }}>
+                    <Compass size={14} />
+                  </span>
+                  <span className="flex-1">Spatial</span>
+                  {activeView === 'spatial' && (
+                    <span className="text-[8px] text-neutral-500 font-normal">ACTIVE</span>
+                  )}
+                </button>
+
+                {/* Grouped — top-level header */}
+                <div className="flex items-center gap-3 px-3 py-2 text-[11px] font-bold tracking-wide text-neutral-500">
+                  <span className="w-5 h-5 flex items-center justify-center rounded">
+                    <LayoutGrid size={14} />
+                  </span>
+                  <span>Grouped</span>
+                </div>
+
+                {/* Grouped sub-items — indented */}
                 {([
-                  { id: 'spatial' as ViewMode, label: 'Spatial', icon: <Compass size={14} />, color: '#ffffff' },
-                  { id: 'terminals' as ViewMode, label: 'Terminals', icon: <TerminalSquare size={14} />, color: '#f59e0b', types: ['terminal'] },
-                  { id: 'editors' as ViewMode, label: 'Editors', icon: <FileCode size={14} />, color: '#10b981', types: ['editor'] },
-                  { id: 'visuals' as ViewMode, label: 'Visuals', icon: <LayoutGrid size={14} />, color: '#3b82f6', types: ['visual'] },
+                  { id: 'terminals' as ViewMode, label: 'Terminals', icon: <TerminalSquare size={13} />, color: '#f59e0b', types: ['terminal'] },
+                  { id: 'editors' as ViewMode, label: 'Editors', icon: <FileCode size={13} />, color: '#10b981', types: ['editor'] },
+                  { id: 'visuals' as ViewMode, label: 'Visuals', icon: <LayoutGrid size={13} />, color: '#3b82f6', types: ['visual'] },
                 ] as const).map((mode) => {
                   const isActive = activeView === mode.id;
-                  const count = mode.id === 'spatial'
-                    ? windows.length
-                    : windows.filter(w => ('types' in mode) && (mode as any).types.includes(w.type)).length;
-                  const isEmpty = mode.id !== 'spatial' && count === 0;
+                  const count = windows.filter(w => mode.types.includes(w.type)).length;
+                  const isEmpty = count === 0;
 
                   return (
                     <button
                       key={mode.id}
                       onClick={() => !isEmpty && onSelectView(mode.id)}
                       className={`
-                        flex items-center gap-3 px-3 py-2 rounded-lg text-[11px] font-bold tracking-wide transition-all duration-200 w-full text-left
+                        flex items-center gap-2.5 pl-8 pr-3 py-1.5 rounded-lg text-[10px] font-bold tracking-wide transition-all duration-200 w-full text-left
                         ${isEmpty
                           ? 'text-neutral-700 cursor-default'
                           : isActive
@@ -582,17 +621,15 @@ const ContextManifest: React.FC<ContextManifestProps> = ({
                       `}
                     >
                       <span
-                        className="w-5 h-5 flex items-center justify-center rounded"
+                        className="w-4 h-4 flex items-center justify-center rounded"
                         style={{ color: isActive ? mode.color : isEmpty ? 'rgb(55,55,55)' : undefined }}
                       >
                         {mode.icon}
                       </span>
                       <span className="flex-1">{mode.label}</span>
-                      {mode.id !== 'spatial' && (
-                        <span className={`text-[9px] font-mono ${isEmpty ? 'text-neutral-700' : isActive ? 'text-neutral-400' : 'text-neutral-600'}`}>
-                          {count}
-                        </span>
-                      )}
+                      <span className={`text-[9px] font-mono ${isEmpty ? 'text-neutral-700' : isActive ? 'text-neutral-400' : 'text-neutral-600'}`}>
+                        {count}
+                      </span>
                       {isActive && !isEmpty && (
                         <span className="text-[8px] text-neutral-500 font-normal">ACTIVE</span>
                       )}
@@ -604,7 +641,7 @@ const ContextManifest: React.FC<ContextManifestProps> = ({
           )}
         </div>
 
-        {/* Modules Section - Collapsible (boot sequence) */}
+        {/* Modules Section - HUD system components */}
         <div className="shrink-0 border-b border-neutral-800/50">
           <button
             onClick={() => setModulesExpanded(!modulesExpanded)}
@@ -613,88 +650,100 @@ const ContextManifest: React.FC<ContextManifestProps> = ({
             <div className="flex items-center gap-2">
               <Layers size={12} className={modulesExpanded ? 'text-emerald-400' : 'text-neutral-500'} />
               <span className="text-[9px] tracking-widest font-bold">MODULES</span>
-              {!isGlobalView && (
-                <span className="text-[8px] text-neutral-600">({windows.length})</span>
-              )}
             </div>
             {modulesExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
           </button>
 
           {modulesExpanded && (
-            <div className="max-h-[250px] overflow-y-auto px-3 pb-3">
-              {logs.length === 0 ? (
-                <div className="text-neutral-500 text-center py-6">
-                  <div className="text-[9px] uppercase tracking-widest mb-2">{isGlobalView ? 'All Contexts' : 'Loading...'}</div>
-                  <div className="text-neutral-600 text-[10px]">{isGlobalView ? 'Select a context to view modules' : 'Initializing boot sequence'}</div>
-                </div>
-              ) : (
-                <div className="flex flex-col gap-1">
-                  {logs.map((log) => {
-                    let debugData: any;
-                    if (log.type === 'window') debugData = windows.find(w => w.id === log.id);
-                    else if (log.type === 'task') debugData = tasks.find(t => t.id === log.id);
-                    else debugData = { _sys_id: log.id, op_code: log.text, state: log.status, ts: Date.now() };
+            <div className="px-3 pb-3">
+              <div className="flex flex-col gap-0.5">
+                {([
+                  { label: 'Canvas', icon: <Compass size={10} />, status: true },
+                  { label: 'Inspector', icon: <Eye size={10} />, status: true },
+                  { label: 'Search', icon: <Search size={10} />, status: true },
+                  { label: 'Terminal', icon: <Terminal size={10} />, status: true },
+                  { label: 'Command Palette', icon: <Key size={10} />, status: true },
+                  { label: 'Voice', icon: <Mic size={10} />, status: true },
+                  { label: 'Logger', icon: <Activity size={10} />, status: true },
+                ] as const).map((mod) => (
+                  <div key={mod.label} className="flex items-center gap-2.5 px-2 py-1 text-[10px] text-neutral-500">
+                    <span className="text-emerald-500/70">{mod.icon}</span>
+                    <span className="flex-1 tracking-wide">{mod.label}</span>
+                    <Check size={8} className="text-neutral-700" />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
 
-                    return (
-                      <div key={log.id} className="flex flex-col">
-                        <div
-                          onClick={() => {
-                            if (log.type === 'window') onItemClick?.(log.id);
-                            if (log.type === 'task') onDiscuss?.(log.id);
-                          }}
-                          className={`
-                            flex items-center gap-3 transition-all duration-300 rounded px-1.5 py-0.5 -mx-1.5 group
-                            ${log.status === 'pending' ? 'opacity-30' : 'opacity-100'}
-                            ${log.type === 'window' ? 'cursor-pointer hover:bg-neutral-800 hover:text-white' : ''}
-                            ${log.type === 'task' ? 'cursor-pointer bg-amber-900/10 hover:bg-amber-900/30 text-amber-500' : ''}
-                          `}
-                        >
-                          <div className="w-3 flex justify-center shrink-0">
-                            {log.status === 'pending' && <Circle size={4} className="text-neutral-700" />}
-                            {log.status === 'loading' && <div className="w-1.5 h-1.5 bg-blue-500 animate-pulse rounded-full" />}
-                            {log.status === 'done' && (
-                              log.type === 'window' ? <Terminal size={10} className="text-emerald-400 group-hover:text-emerald-300" /> :
-                              log.type === 'task' ? <MessageSquare size={10} className="text-amber-500" /> :
-                              <Check size={10} className="text-neutral-600" />
-                            )}
-                          </div>
+        {/* Windows Section - Canvas layer navigator */}
+        <div className="shrink-0 border-b border-neutral-800/50">
+          <button
+            onClick={() => setWindowsExpanded(!windowsExpanded)}
+            className="w-full px-3 py-2 flex items-center justify-between text-neutral-400 hover:bg-white/5 transition-colors"
+          >
+            <div className="flex items-center gap-2">
+              <Box size={12} className={windowsExpanded ? 'text-emerald-400' : 'text-neutral-500'} />
+              <span className="text-[9px] tracking-widest font-bold">WINDOWS</span>
+              <span className="text-[8px] text-neutral-600">({windows.length})</span>
+            </div>
+            {windowsExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+          </button>
 
-                          <span className={`
-                            truncate tracking-tight flex-1
-                            ${log.status === 'loading' ? 'text-blue-400' : ''}
-                            ${log.status === 'done' && log.type === 'window' ? 'text-neutral-200 font-bold group-hover:underline decoration-neutral-600 decoration-dotted underline-offset-4' : ''}
-                            ${log.status === 'done' && log.type === 'task' ? 'text-amber-500/90 font-medium' : ''}
-                            ${log.status === 'done' && log.type === 'system' ? 'text-neutral-500' : ''}
-                          `}>
-                            {log.text}
-                          </span>
-
-                          {log.status === 'done' && log.type === 'window' && !isDebugExpanded && (
-                            <div className="opacity-0 group-hover:opacity-100 transition-opacity">
-                              <MousePointer2 size={10} className="text-emerald-500" />
-                            </div>
-                          )}
-                          {log.status === 'done' && log.type === 'task' && !isDebugExpanded && (
-                            <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
-                              <span className="text-[8px] uppercase">Discuss</span>
-                              <Sparkles size={10} className="text-amber-400" />
-                            </div>
-                          )}
-                          {isDebugExpanded && log.status === 'done' && <Database size={10} className="text-neutral-600" />}
-                        </div>
-
-                        {isDebugExpanded && log.status !== 'pending' && (
-                          <div className="pl-6 pr-1 py-1 animate-in slide-in-from-top-1 fade-in duration-200">
-                            <div className="bg-[#0b0b0b] border border-neutral-800/80 rounded p-2 shadow-inner overflow-hidden relative group/code">
-                              <pre className="text-[9px] text-emerald-500/90 font-mono leading-relaxed whitespace-pre-wrap break-all">
-                                {JSON.stringify(debugData, null, 2)}
-                              </pre>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
+          {windowsExpanded && (
+            <div className="max-h-[300px] overflow-y-auto px-3 pb-3">
+              {contexts.filter(c => c.id !== 'global').map(ctx => {
+                const ctxWindows = windows.filter(w => w.contextId === ctx.id);
+                if (ctxWindows.length === 0) return null;
+                return (
+                  <div key={ctx.id} className="mb-2">
+                    <div className="flex items-center gap-1.5 px-1 py-1">
+                      <div className="w-1.5 h-1.5 rounded-full" style={{ background: ctx.color }} />
+                      <span className="text-[9px] tracking-widest font-bold uppercase" style={{ color: ctx.color }}>{ctx.label}</span>
+                    </div>
+                    {ctxWindows.map(w => (
+                      <button
+                        key={w.id}
+                        onClick={() => onItemClick?.(w.id)}
+                        className={`
+                          w-full flex items-center gap-2 pl-4 pr-2 py-1 rounded text-left transition-all group
+                          ${selectedWindowId === w.id
+                            ? 'bg-white/10 text-white'
+                            : 'text-neutral-500 hover:text-white hover:bg-white/5'}
+                        `}
+                      >
+                        <span className="text-[10px] flex-1 truncate">{w.title}</span>
+                        <span className="text-[8px] text-neutral-700 font-mono">{w.type}</span>
+                        <MousePointer2 size={9} className="text-emerald-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+                      </button>
+                    ))}
+                  </div>
+                );
+              })}
+              {/* Ungrouped windows (global context) */}
+              {windows.filter(w => !w.contextId || w.contextId === 'global').length > 0 && (
+                <div className="mb-2">
+                  <div className="flex items-center gap-1.5 px-1 py-1">
+                    <div className="w-1.5 h-1.5 rounded-full bg-neutral-500" />
+                    <span className="text-[9px] tracking-widest font-bold uppercase text-neutral-500">GLOBAL</span>
+                  </div>
+                  {windows.filter(w => !w.contextId || w.contextId === 'global').map(w => (
+                    <button
+                      key={w.id}
+                      onClick={() => onItemClick?.(w.id)}
+                      className={`
+                        w-full flex items-center gap-2 pl-4 pr-2 py-1 rounded text-left transition-all group
+                        ${selectedWindowId === w.id
+                          ? 'bg-white/10 text-white'
+                          : 'text-neutral-500 hover:text-white hover:bg-white/5'}
+                      `}
+                    >
+                      <span className="text-[10px] flex-1 truncate">{w.title}</span>
+                      <span className="text-[8px] text-neutral-700 font-mono">{w.type}</span>
+                      <MousePointer2 size={9} className="text-emerald-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </button>
+                  ))}
                 </div>
               )}
             </div>
