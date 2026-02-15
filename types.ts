@@ -45,7 +45,9 @@ export type WindowType =
   | 'chat'
   | 'dither'
   | 'textlab'
-  | 'index';
+  | 'index'
+  | 'quickstart'
+  | 'shortcuts';
 
 export interface WindowState {
   id: string;

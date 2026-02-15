@@ -553,6 +553,42 @@ const ContextManifest: React.FC<ContextManifestProps> = ({
           )}
         </div>
 
+        {/* Modules Section - HUD system components */}
+        <div className="shrink-0 border-b border-neutral-800/50">
+          <button
+            onClick={() => setModulesExpanded(!modulesExpanded)}
+            className="w-full px-3 py-2 flex items-center justify-between text-neutral-400 hover:bg-white/5 transition-colors"
+          >
+            <div className="flex items-center gap-2">
+              <Layers size={12} className={modulesExpanded ? 'text-emerald-400' : 'text-neutral-500'} />
+              <span className="text-[9px] tracking-widest font-bold">MODULES</span>
+            </div>
+            {modulesExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+          </button>
+
+          {modulesExpanded && (
+            <div className="px-3 pb-3">
+              <div className="flex flex-col gap-0.5">
+                {([
+                  { label: 'Canvas', icon: <Compass size={10} /> },
+                  { label: 'Inspector', icon: <Eye size={10} /> },
+                  { label: 'Search', icon: <Search size={10} /> },
+                  { label: 'Terminal', icon: <Terminal size={10} /> },
+                  { label: 'Command Palette', icon: <Key size={10} /> },
+                  { label: 'Voice', icon: <Mic size={10} /> },
+                  { label: 'Logger', icon: <Activity size={10} /> },
+                ] as const).map((mod) => (
+                  <div key={mod.label} className="flex items-center gap-2.5 px-2 py-1 text-[10px] text-neutral-500">
+                    <span className="text-emerald-500/70">{mod.icon}</span>
+                    <span className="flex-1 tracking-wide">{mod.label}</span>
+                    <Check size={8} className="text-neutral-700" />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
         {/* View Modes Section - Collapsible */}
         <div className="shrink-0 border-b border-neutral-800/50">
           <button
@@ -560,9 +596,9 @@ const ContextManifest: React.FC<ContextManifestProps> = ({
             className="w-full px-3 py-2 flex items-center justify-between text-neutral-400 hover:bg-white/5 transition-colors"
           >
             <div className="flex items-center gap-2">
-              <Compass size={12} className={viewModesExpanded ? 'text-white' : 'text-neutral-500'} />
-              <span className="text-[9px] tracking-widest font-bold">VIEW MODE</span>
-              <span className="text-[8px] text-neutral-600 uppercase">{activeView}</span>
+              <Compass size={12} className={viewModesExpanded ? 'text-emerald-400' : 'text-neutral-500'} />
+              <span className="text-[9px] tracking-widest font-bold leading-none">VIEW MODE</span>
+              <span className="text-[9px] text-emerald-500/70 uppercase font-mono leading-none">{activeView}</span>
             </div>
             {viewModesExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
           </button>
@@ -641,42 +677,6 @@ const ContextManifest: React.FC<ContextManifestProps> = ({
           )}
         </div>
 
-        {/* Modules Section - HUD system components */}
-        <div className="shrink-0 border-b border-neutral-800/50">
-          <button
-            onClick={() => setModulesExpanded(!modulesExpanded)}
-            className="w-full px-3 py-2 flex items-center justify-between text-neutral-400 hover:bg-white/5 transition-colors"
-          >
-            <div className="flex items-center gap-2">
-              <Layers size={12} className={modulesExpanded ? 'text-emerald-400' : 'text-neutral-500'} />
-              <span className="text-[9px] tracking-widest font-bold">MODULES</span>
-            </div>
-            {modulesExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-          </button>
-
-          {modulesExpanded && (
-            <div className="px-3 pb-3">
-              <div className="flex flex-col gap-0.5">
-                {([
-                  { label: 'Canvas', icon: <Compass size={10} />, status: true },
-                  { label: 'Inspector', icon: <Eye size={10} />, status: true },
-                  { label: 'Search', icon: <Search size={10} />, status: true },
-                  { label: 'Terminal', icon: <Terminal size={10} />, status: true },
-                  { label: 'Command Palette', icon: <Key size={10} />, status: true },
-                  { label: 'Voice', icon: <Mic size={10} />, status: true },
-                  { label: 'Logger', icon: <Activity size={10} />, status: true },
-                ] as const).map((mod) => (
-                  <div key={mod.label} className="flex items-center gap-2.5 px-2 py-1 text-[10px] text-neutral-500">
-                    <span className="text-emerald-500/70">{mod.icon}</span>
-                    <span className="flex-1 tracking-wide">{mod.label}</span>
-                    <Check size={8} className="text-neutral-700" />
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-
         {/* Windows Section - Canvas layer navigator */}
         <div className="shrink-0 border-b border-neutral-800/50">
           <button
@@ -696,52 +696,61 @@ const ContextManifest: React.FC<ContextManifestProps> = ({
               {contexts.filter(c => c.id !== 'global').map(ctx => {
                 const ctxWindows = windows.filter(w => w.contextId === ctx.id);
                 if (ctxWindows.length === 0) return null;
+                const isActiveZone = activeContextId === ctx.id;
                 return (
-                  <div key={ctx.id} className="mb-2">
-                    <div className="flex items-center gap-1.5 px-1 py-1">
-                      <div className="w-1.5 h-1.5 rounded-full" style={{ background: ctx.color }} />
-                      <span className="text-[9px] tracking-widest font-bold uppercase" style={{ color: ctx.color }}>{ctx.label}</span>
-                    </div>
+                  <div key={ctx.id} className="mb-1.5">
+                    <button
+                      onClick={() => {
+                        if (isActiveZone) {
+                          onViewAll?.();
+                        } else {
+                          onItemClick?.(ctxWindows[0]?.id);
+                        }
+                      }}
+                      className={`w-full flex items-center gap-1.5 px-1 py-1 rounded hover:bg-white/5 transition-colors ${isActiveZone ? 'bg-white/5' : ''}`}
+                    >
+                      <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: ctx.color }} />
+                      <span className="text-[9px] tracking-widest font-bold uppercase flex-1 text-left" style={{ color: isActiveZone ? ctx.color : 'rgb(120,120,120)' }}>{ctx.label}</span>
+                      <span className="text-[8px] text-neutral-700 font-mono">{ctxWindows.length}</span>
+                    </button>
                     {ctxWindows.map(w => (
                       <button
                         key={w.id}
                         onClick={() => onItemClick?.(w.id)}
                         className={`
-                          w-full flex items-center gap-2 pl-4 pr-2 py-1 rounded text-left transition-all group
+                          w-full flex items-center gap-2 pl-5 pr-2 py-1 rounded text-left transition-all group
                           ${selectedWindowId === w.id
                             ? 'bg-white/10 text-white'
                             : 'text-neutral-500 hover:text-white hover:bg-white/5'}
                         `}
                       >
                         <span className="text-[10px] flex-1 truncate">{w.title}</span>
-                        <span className="text-[8px] text-neutral-700 font-mono">{w.type}</span>
-                        <MousePointer2 size={9} className="text-emerald-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+                        <MousePointer2 size={9} className="text-emerald-500 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
                       </button>
                     ))}
                   </div>
                 );
               })}
-              {/* Ungrouped windows (global context) */}
+              {/* Global / ungrouped windows */}
               {windows.filter(w => !w.contextId || w.contextId === 'global').length > 0 && (
-                <div className="mb-2">
+                <div className="mb-1.5">
                   <div className="flex items-center gap-1.5 px-1 py-1">
-                    <div className="w-1.5 h-1.5 rounded-full bg-neutral-500" />
-                    <span className="text-[9px] tracking-widest font-bold uppercase text-neutral-500">GLOBAL</span>
+                    <div className="w-1.5 h-1.5 rounded-full bg-neutral-600 shrink-0" />
+                    <span className="text-[9px] tracking-widest font-bold uppercase text-neutral-600 flex-1">GLOBAL</span>
                   </div>
                   {windows.filter(w => !w.contextId || w.contextId === 'global').map(w => (
                     <button
                       key={w.id}
                       onClick={() => onItemClick?.(w.id)}
                       className={`
-                        w-full flex items-center gap-2 pl-4 pr-2 py-1 rounded text-left transition-all group
+                        w-full flex items-center gap-2 pl-5 pr-2 py-1 rounded text-left transition-all group
                         ${selectedWindowId === w.id
                           ? 'bg-white/10 text-white'
                           : 'text-neutral-500 hover:text-white hover:bg-white/5'}
                       `}
                     >
                       <span className="text-[10px] flex-1 truncate">{w.title}</span>
-                      <span className="text-[8px] text-neutral-700 font-mono">{w.type}</span>
-                      <MousePointer2 size={9} className="text-emerald-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+                      <MousePointer2 size={9} className="text-emerald-500 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
                     </button>
                   ))}
                 </div>

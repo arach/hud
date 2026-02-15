@@ -93,8 +93,10 @@ const DEFAULT_WINDOWS: WindowState[] = [
   { id: 'ui', contextId: 'studio', namespace: buildNamespace('studio', 'visual', 'ui'), type: 'visual', title: 'UI Preview', ...layout(WORKSPACE_ORIGINS.studio, 0, 0, 800, 720), zIndex: 11 },
   { id: 'diff', contextId: 'studio', namespace: buildNamespace('studio', 'editor', 'diff'), type: 'editor', title: 'Diff Viewer', ...layout(WORKSPACE_ORIGINS.studio, 820, 0, 400, 720), zIndex: 10 },
 
-  // INDEX — centered between all 4 zones
-  { id: 'index', contextId: 'global', namespace: 'hud.index', type: 'index', title: 'Index', x: 1400, y: 1050, w: 340, h: 420, zIndex: 50 },
+  // WELCOME PACKET — above main zones
+  { id: 'index', contextId: 'global', namespace: 'hud.index', type: 'index', title: 'Index', x: 0, y: -580, w: 340, h: 480, zIndex: 50 },
+  { id: 'quickstart', contextId: 'global', namespace: 'hud.quickstart', type: 'quickstart', title: 'Quick Start', x: 360, y: -580, w: 380, h: 480, zIndex: 50 },
+  { id: 'shortcuts', contextId: 'global', namespace: 'hud.shortcuts', type: 'shortcuts', title: 'Shortcuts', x: 760, y: -580, w: 300, h: 480, zIndex: 50 },
 ];
 
 const INITIAL_THREADS: AiThread[] = [];

@@ -58,8 +58,15 @@ import {
 const App: React.FC = () => {
   // -- Global UI State (Viewport / Interactivity) --
   const [viewport, setViewport] = useState({ width: window.innerWidth, height: window.innerHeight });
-  const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
-  const [scale, setScale] = useState(0.8);
+  // Initial pan centers on welcome packet (world center ~530, -340)
+  const [panOffset, setPanOffset] = useState(() => {
+    const initScale = 1.0;
+    return {
+      x: (window.innerWidth / 2) / initScale - 530,
+      y: (window.innerHeight / 2) / initScale - (-340),
+    };
+  });
+  const [scale, setScale] = useState(1.0);
   const [isCmdPaletteOpen, setIsCmdPaletteOpen] = useState(false);
   const [isTerminalOpen, setIsTerminalOpen] = useState(false);
   const [isTerminalMaximized, setIsTerminalMaximized] = useState(false);
@@ -421,19 +428,7 @@ Alex`
 
   }, [windows, scale, setPanOffsetWithLog, getHudSafeViewport]);
 
-  // Initial mount effect to show "view all" state
-  useEffect(() => {
-    if (hasInitializedRef.current) return;
-    hasInitializedRef.current = true;
 
-    // Small delay to let layout settle
-    const timer = setTimeout(() => {
-      focusContext('global');
-      setIsOverviewMode(true);
-    }, 100);
-
-    return () => clearTimeout(timer);
-  }, [focusContext]);
 
   useEffect(() => {
     if (!pendingContextFocusId) return;
@@ -507,6 +502,8 @@ Alex`
       }
     });
 
+    // Only return if click is reasonably close to a zone (within ~800px of center)
+    if (minDist > 800) return null;
     return nearestCtx;
   }, [scale, panOffset, contexts, contextSizes, getHudSafeViewport]);
 
@@ -569,8 +566,8 @@ Alex`
       return;
     }
 
-    // Only deselect if something is actually selected
-    const hasSelection = selectedWindowId || selectedContextId || selectedFilter || activeView !== 'spatial';
+    // Deselect windows, filters, and exit focused context
+    const hasSelection = selectedWindowId || selectedContextId || selectedFilter || activeView !== 'spatial' || activeContextId !== 'global';
     if (hasSelection) {
       setSelectedWindowId(null);
       setSelectedContextId(null);
@@ -578,16 +575,62 @@ Alex`
       if (activeView !== 'spatial') {
         setActiveView('spatial');
       }
+      if (activeContextId !== 'global') {
+        setActiveContextId('global');
+        focusWelcome();
+      }
     }
   }, [isOverviewMode, findNearestContext, handleContextSelect, activeView, setActiveView, selectedWindowId, selectedContextId, selectedFilter]);
+
+  const WELCOME_TYPES = ['index', 'quickstart', 'shortcuts'];
+
+  const focusWelcome = useCallback(() => {
+    // Welcome packet spans x:0..1060, y:-580..-100
+    const welcomeCenterX = 530;
+    const welcomeCenterY = -340;
+
+    const safeViewport = getHudSafeViewport();
+    // If viewport not ready yet, use window dimensions as fallback
+    const vw = safeViewport.safeWidth || window.innerWidth;
+    const vh = safeViewport.safeHeight || window.innerHeight;
+    const cx = safeViewport.centerX || window.innerWidth / 2;
+    const cy = safeViewport.centerY || window.innerHeight / 2;
+
+    const scaleX = vw / (1060 + 160);
+    const scaleY = vh / (480 + 160);
+    let targetScale = Math.min(scaleX, scaleY);
+    targetScale = Math.max(0.5, Math.min(targetScale, 1.2));
+
+    const targetPanX = (cx / targetScale) - welcomeCenterX;
+    const targetPanY = (cy / targetScale) - welcomeCenterY;
+
+    console.log('[HUD] focusWelcome', { targetScale, targetPanX, targetPanY, safeViewport });
+    setIsTransitioning(true);
+    setScale(targetScale);
+    setPanOffsetWithLog({ x: targetPanX, y: targetPanY }, 'focusWelcome');
+    setTimeout(() => setIsTransitioning(false), 750);
+  }, [getHudSafeViewport, setPanOffsetWithLog]);
 
   const handleAutoLayout = useCallback(() => {
     resetLayout();
     setTimeout(() => {
-      focusContext('global');
+      focusWelcome();
       setIsOverviewMode(true);
     }, 10);
-  }, [resetLayout, focusContext]);
+  }, [resetLayout, focusWelcome]);
+
+  // Initial mount — focus welcome cards
+  useEffect(() => {
+    if (hasInitializedRef.current) return;
+    hasInitializedRef.current = true;
+
+    const timer = setTimeout(() => {
+      focusWelcome();
+      setIsOverviewMode(true);
+    }, 150);
+
+    return () => clearTimeout(timer);
+  }, [focusWelcome]);
 
   const handleFocusWindow = useCallback((id: string) => {
       console.log('[HUD] focusWindow triggered', { id });
@@ -1021,11 +1064,12 @@ CURRENT HUD ENVIRONMENT:
 
     // Special case: Index navigation card
     if (type === 'index') {
+      const WELCOME_TYPES = ['index', 'quickstart', 'shortcuts'];
       return (
         <div className="flex flex-col h-full overflow-auto p-4 gap-3">
           <div className="text-[10px] text-neutral-500 tracking-widest uppercase font-mono">Workspaces</div>
           {contexts.filter(c => c.id !== 'global').map(ctx => {
-            const ctxWindows = windows.filter(w => w.contextId === ctx.id);
+            const ctxWindows = windows.filter(w => w.contextId === ctx.id && !WELCOME_TYPES.includes(w.type));
             return (
               <button
                 key={ctx.id}
@@ -1056,9 +1100,55 @@ CURRENT HUD ENVIRONMENT:
           })}
           <div className="mt-auto pt-3 border-t border-neutral-800/50">
             <div className="text-[9px] text-neutral-600 font-mono leading-relaxed">
-              {windows.length} modules · {contexts.filter(c => c.id !== 'global').length} zones
+              {windows.filter(w => !['index', 'quickstart', 'shortcuts'].includes(w.type)).length} modules · {contexts.filter(c => c.id !== 'global').length} zones
             </div>
           </div>
+        </div>
+      );
+    }
+
+    // Special case: Quick Start guide
+    if (type === 'quickstart') {
+      return (
+        <div className="flex flex-col h-full overflow-auto p-4 gap-4">
+          <div className="text-[10px] text-neutral-500 tracking-widest uppercase font-mono">Getting Started</div>
+          {([
+            { title: 'Navigate', desc: 'Click and drag the canvas to pan around. Scroll to zoom in and out. Click a zone to focus on it.' },
+            { title: 'Voice', desc: 'Click the mic button in the top-right toolbar to start a voice session. Speak commands to create windows, switch contexts, or control tools.' },
+            { title: 'Command Palette', desc: 'Press \u2318K to open the command palette. Search for actions, tools, and navigation shortcuts.' },
+            { title: 'Windows', desc: 'Drag title bars to move windows. Use the expand button to go full-view. Click the close dot to dismiss. Double-click to zoom in.' },
+            { title: 'Contexts', desc: 'Your workspace is organized into 4 zones. Use the sidebar or click zones on the canvas to switch between them.' },
+          ] as const).map((item) => (
+            <div key={item.title}>
+              <div className="text-[11px] font-bold text-neutral-300 mb-0.5">{item.title}</div>
+              <div className="text-[10px] text-neutral-500 leading-relaxed">{item.desc}</div>
+            </div>
+          ))}
+        </div>
+      );
+    }
+
+    // Special case: Keyboard shortcuts reference
+    if (type === 'shortcuts') {
+      return (
+        <div className="flex flex-col h-full overflow-auto p-4 gap-1">
+          <div className="text-[10px] text-neutral-500 tracking-widest uppercase font-mono mb-2">Keyboard</div>
+          {([
+            ['\u2318K', 'Command Palette'],
+            ['Ctrl + `', 'Toggle Terminal'],
+            ['\u2318\\', 'Toggle Guides'],
+            ['\u2318R', 'Reset View'],
+            ['Scroll', 'Zoom In / Out'],
+            ['Click + Drag', 'Pan Canvas'],
+            ['Click Zone', 'Focus Context'],
+            ['Click Empty', 'Deselect / Overview'],
+            ['Expand \u2197', 'Full-view Window'],
+          ] as const).map(([key, label]) => (
+            <div key={label} className="flex items-center gap-3 py-1.5">
+              <span className="text-[10px] font-mono text-emerald-500/70 w-20 text-right shrink-0">{key}</span>
+              <span className="text-[10px] text-neutral-400">{label}</span>
+            </div>
+          ))}
         </div>
       );
     }

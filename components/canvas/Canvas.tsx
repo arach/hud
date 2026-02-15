@@ -306,15 +306,6 @@ const Canvas: React.FC<CanvasProps> = ({ panOffset, scale, onPan, onPanStart, on
         }}
       />
 
-      {/* Origin Marker (World 0,0) */}
-      <div 
-         className="absolute w-2 h-2 bg-emerald-500 rounded-full opacity-50 pointer-events-none"
-         style={{ 
-             left: `calc(50% + ${panOffset.x * scale}px - 4px)`, 
-             top: `calc(50% + ${panOffset.y * scale}px - 4px)` 
-         }}
-      />
-
       {/* Cursor Guides */}
       {showGuides && (
         <>
