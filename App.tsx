@@ -590,6 +590,7 @@ Alex`
   }, [resetLayout, focusContext]);
 
   const handleFocusWindow = useCallback((id: string) => {
+      console.log('[HUD] focusWindow triggered', { id });
       thock();
       setSelectedWindowId(id);
       setSelectedContextId(null);
@@ -603,30 +604,40 @@ Alex`
       if (activeView !== 'spatial') {
         setActiveView('spatial');
       }
-      
-      const win = focusWindowInContext(id);
-      if (win) {
-          setIsTransitioning(true);
-          const fitPadding = 1.4;
-          const safeViewport = getHudSafeViewport();
-          const scaleX = safeViewport.safeWidth / (win.w * fitPadding);
-          const scaleY = safeViewport.safeHeight / (win.h * fitPadding);
-          
-          let targetScale = Math.min(scaleX, scaleY);
-          targetScale = Math.max(0.5, Math.min(targetScale, 1.2));
 
-          const winCenterX = win.x + (win.w / 2);
-          const winCenterY = win.y + (win.h / 2);
+      const win = windows.find(w => w.id === id);
+      if (!win) return;
 
-          const targetPanX = (safeViewport.centerX / targetScale) - winCenterX;
-          const targetPanY = (safeViewport.centerY / targetScale) - winCenterY;
-
-          setScale(targetScale);
-          setPanOffsetWithLog({ x: targetPanX, y: targetPanY }, 'focusWindow');
-
-          setTimeout(() => setIsTransitioning(false), 750);
+      // If already expanded, minimize back to original size
+      if (win.preExpandSize) {
+          console.log('[HUD] minimizing window', { id, restoreTo: win.preExpandSize });
+          updateWindow(id, { w: win.preExpandSize.w, h: win.preExpandSize.h, preExpandSize: undefined });
+          return;
       }
-  }, [focusWindowInContext, activeView, getHudSafeViewport, setActiveView, setPanOffsetWithLog]);
+
+      // Save original size, then expand
+      selectWindow(id);
+      setIsTransitioning(true);
+      const safeViewport = getHudSafeViewport();
+      const padX = 80;
+      const padTop = 80;
+      const padBottom = 60;
+
+      const targetW = Math.round(safeViewport.safeWidth - padX * 2);
+      const targetH = Math.round(safeViewport.safeHeight - padTop - padBottom);
+      console.log('[HUD] expanding window', { id, from: { w: win.w, h: win.h }, to: { w: targetW, h: targetH } });
+      updateWindow(id, { w: targetW, h: targetH, preExpandSize: { w: win.w, h: win.h } });
+
+      const winCenterX = win.x + (targetW / 2);
+      const winCenterY = win.y + (targetH / 2);
+      const targetPanX = safeViewport.centerX - winCenterX;
+      const targetPanY = safeViewport.centerY - winCenterY + (padTop - padBottom) / 2;
+
+      setScale(1);
+      setPanOffsetWithLog({ x: targetPanX, y: targetPanY }, 'focusWindow');
+
+      setTimeout(() => setIsTransitioning(false), 750);
+  }, [windows, activeView, getHudSafeViewport, setActiveView, setPanOffsetWithLog, updateWindow, selectWindow]);
 
   const handleContextZoneSelect = useCallback((contextId: string) => {
       setSelectedContextId(contextId);
@@ -1301,22 +1312,17 @@ CURRENT HUD ENVIRONMENT:
                       isSelected={selectedWindowId === win.id}
                       isDimmed={renderProps.opacity < 1}
                       isDragDisabled={activeView !== 'spatial'}
+                      isExpanded={!!win.preExpandSize}
                       aiThread={activeThread}
                       onMove={handleWindowMove}
                       onResize={handleWindowResize}
                       onSelect={handleWindowSelect}
-                      onClose={closeWindow}
+                      onFocus={handleFocusWindow}
+                      onClose={(id) => { blipDown(); closeWindow(id); }}
                       className={'bg-black border border-neutral-600 ring-1 ring-white/[0.04] flex flex-col'}
                   >
-                      <div className="h-7 bg-neutral-900 border-b border-neutral-700 flex items-center justify-center px-2 select-none shrink-0 relative">
+                      <div className="h-7 bg-neutral-900 border-b border-neutral-700 flex items-center justify-center px-2 select-none shrink-0">
                           <span className="text-[10px] font-bold tracking-widest text-neutral-400 uppercase">{win.title}</span>
-                          <div className="absolute right-2 flex gap-1 group">
-                              <div 
-                                onClick={(e) => { e.stopPropagation(); blipDown(); closeWindow(win.id); }}
-                                className="w-1.5 h-1.5 rounded-full bg-neutral-700 hover:bg-red-500 transition-colors cursor-pointer"
-                                title="Close Window"
-                              ></div>
-                          </div>
                       </div>
                       <div className="flex-1 min-h-0 overflow-hidden relative">
                           {renderWindowContent(win)}

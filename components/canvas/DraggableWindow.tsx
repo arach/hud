@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { MessageCircle, Sparkles } from 'lucide-react';
+import { MessageCircle, Sparkles, Maximize2, Minimize2 } from 'lucide-react';
 
 interface DraggableWindowProps {
   id: string;
@@ -14,11 +14,13 @@ interface DraggableWindowProps {
   isSelected: boolean;
   isDimmed?: boolean;
   isDragDisabled?: boolean; 
+  isExpanded?: boolean;
   aiThread?: { topic: string; messageCount: number };
   onMove: (id: string, x: number, y: number) => void;
   onResize: (id: string, w: number, h: number) => void;
   onSelect: (id: string) => void;
-  onClose?: (id: string) => void; // New Prop
+  onFocus?: (id: string) => void;
+  onClose?: (id: string) => void;
   children: React.ReactNode;
   className?: string;
 }
@@ -35,10 +37,12 @@ const DraggableWindow: React.FC<DraggableWindowProps> = ({
   isSelected,
   isDimmed = false,
   isDragDisabled = false,
+  isExpanded = false,
   aiThread,
   onMove, 
   onResize,
   onSelect,
+  onFocus,
   onClose,
   children, 
   className = '' 
@@ -83,11 +87,12 @@ const DraggableWindow: React.FC<DraggableWindowProps> = ({
   const handleMouseDown = (e: React.MouseEvent) => {
     // Only start drag if left click and dragging is enabled
     if (e.button !== 0) return;
-    
+    console.log('[HUD] dragHandle mouseDown', id, 'target:', (e.target as HTMLElement).className);
+
     e.stopPropagation();
     e.preventDefault(); // Prevent text selection start
     onSelect(id);
-    
+
     if (isDragDisabled) return; // Stop here if locked
 
     setIsDragging(true);
@@ -108,6 +113,7 @@ const DraggableWindow: React.FC<DraggableWindowProps> = ({
   };
 
   const handleContentMouseDown = (e: React.MouseEvent) => {
+     console.log('[HUD] content mouseDown', id, 'target:', (e.target as HTMLElement).className);
      e.stopPropagation();
      // Do not prevent default here to allow text selection
      onSelect(id);
@@ -176,11 +182,41 @@ const DraggableWindow: React.FC<DraggableWindowProps> = ({
       )}
 
       {/* DRAG HANDLE */}
-      <div 
-          className={`absolute top-0 left-0 right-0 h-6 z-50 ${isDragDisabled ? 'cursor-default' : 'cursor-grab active:cursor-grabbing'}`}
+      <div
+          className={`absolute top-0 left-0 right-0 h-7 z-50 ${isDragDisabled ? 'cursor-default' : 'cursor-grab active:cursor-grabbing'}`}
           onMouseDown={handleMouseDown}
-          title={isDragDisabled ? "Position Locked (Grid View)" : "Drag to move"}
-      ></div>
+          onDoubleClick={(e) => { e.stopPropagation(); onFocus?.(id); }}
+          title={isDragDisabled ? "Position Locked (Grid View)" : "Drag to move · Double-click to zoom"}
+      />
+
+      {/* Window Controls — rendered AFTER drag handle so it paints on top */}
+      {!isDimmed && (onClose || onFocus) && (
+        <div
+          className="absolute top-0 left-0 h-7 flex items-center gap-2 px-2"
+          style={{ zIndex: 999, pointerEvents: 'auto' }}
+          onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); }}
+          onClick={(e) => { e.stopPropagation(); }}
+        >
+          {onClose && (
+            <div
+              onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); }}
+              onClick={(e) => { e.stopPropagation(); console.log('[HUD] close clicked', id); onClose(id); }}
+              className="w-3 h-3 rounded-full bg-neutral-700 hover:bg-red-500 transition-colors cursor-pointer"
+              title="Close"
+            />
+          )}
+          {onFocus && (
+            <div
+              onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); }}
+              onClick={(e) => { e.stopPropagation(); onFocus(id); }}
+              className="w-5 h-5 flex items-center justify-center text-neutral-600 hover:text-emerald-400 transition-colors cursor-pointer"
+              title={isExpanded ? "Restore size" : "Expand to focus"}
+            >
+              {isExpanded ? <Minimize2 size={11} /> : <Maximize2 size={11} />}
+            </div>
+          )}
+        </div>
+      )}
 
       {children}
 

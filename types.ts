@@ -58,6 +58,7 @@ export interface WindowState {
   h: number;
   zIndex: number;
   title: string;
+  preExpandSize?: { w: number; h: number };
 }
 
 export interface AiThread {
