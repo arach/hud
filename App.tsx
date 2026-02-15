@@ -184,6 +184,7 @@ Alex`
     focusWindow: focusWindowInContext,
     resetLayout,
     checkAuth,
+    clearKey,
     getSyntheticLayout,
     addLocalMessage
   } = useHud();
@@ -1027,6 +1028,29 @@ CURRENT HUD ENVIRONMENT:
         addLocalMessage('user', text);
         setMuted(true);
         addLocalMessage('system', 'SOUND_ENGINE MUTED');
+        return;
+      }
+
+      // /help — show available commands
+      if (trimmed === '/help') {
+        addLocalMessage('user', text);
+        addLocalMessage('system', `AVAILABLE COMMANDS
+
+  /help              show this message
+  /clear-key         remove stored API key
+  /sounds            list sound engine controls
+  /sounds play <n>   preview a sound
+  /sounds on|off     mute/unmute UI sounds
+
+Or just type naturally to talk to HUD.`);
+        return;
+      }
+
+      // /clear-key — remove stored API key
+      if (trimmed === '/clear-key' || trimmed === '/clearkey') {
+        addLocalMessage('user', text);
+        clearKey();
+        addLocalMessage('system', 'API_KEY cleared from localStorage. You will be prompted on next voice/chat action.');
         return;
       }
 

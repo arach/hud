@@ -6,6 +6,7 @@ interface AuthContextType {
   isModalOpen: boolean;
   requestAuth: () => void;
   saveKey: (key: string) => void;
+  clearKey: () => void;
   checkAuth: () => boolean;
 }
 
@@ -40,6 +41,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsModalOpen(false);
   }, []);
 
+  const clearKey = useCallback(() => {
+    localStorage.removeItem('GEMINI_API_KEY');
+    geminiService.initialize('');
+    setHasApiKey(false);
+  }, []);
+
   const checkAuth = useCallback(() => {
       if (!hasApiKey) {
           requestAuth();
@@ -49,7 +56,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [hasApiKey, requestAuth]);
 
   return (
-    <AuthContext.Provider value={{ hasApiKey, isModalOpen, requestAuth, saveKey, checkAuth }}>
+    <AuthContext.Provider value={{ hasApiKey, isModalOpen, requestAuth, saveKey, clearKey, checkAuth }}>
       {children}
     </AuthContext.Provider>
   );

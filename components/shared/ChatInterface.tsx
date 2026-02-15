@@ -103,12 +103,19 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
         
         {/* Welcome Message */}
         <div className="text-neutral-500 select-none pb-4 border-b border-neutral-800/50 mb-4">
-            <p>HUD OS [Version 2.0.4]</p>
-            <p className="opacity-50">(c) 2026 HUD Systems. All rights reserved.</p>
+            <p>HUD OS <span className="opacity-50">[v2.0.4]</span></p>
             <p className="text-emerald-500/80 mt-2 flex items-center gap-2">
                 <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
-                System initialized. Uplink established.
+                System ready
             </p>
+            <div className="mt-3 flex flex-col gap-1.5 text-[10px]">
+              <p className="text-neutral-400 mb-1">Try something:</p>
+              <p className="text-neutral-600"><span className="text-neutral-500">navigate</span> — "show me the code editor" · "go to blueprints"</p>
+              <p className="text-neutral-600"><span className="text-neutral-500">create</span> — "open a new terminal" · "create a diff viewer"</p>
+              <p className="text-neutral-600"><span className="text-neutral-500">organize</span> — "show all editors" · "zoom out"</p>
+              <p className="text-neutral-600"><span className="text-neutral-500">creative</span> — "open dither tool" · "make it look retro"</p>
+              <p className="text-neutral-600"><span className="text-neutral-500">tasks</span> — "add a task" · "what's on my list?"</p>
+            </div>
         </div>
 
         {/* Message History */}

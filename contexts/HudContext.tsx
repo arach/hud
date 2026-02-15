@@ -146,13 +146,14 @@ interface HudContextType {
   focusWindow: (id: string) => WindowState | undefined;
   resetLayout: () => void;
   checkAuth: () => boolean;
+  clearKey: () => void;
   getSyntheticLayout: (win: WindowState, viewport: {width: number, height: number}, panOffset: {x: number, y: number}, scale: number) => SyntheticLayout;
 }
 
 const HudContext = createContext<HudContextType | undefined>(undefined);
 
 export const HudProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { hasApiKey, checkAuth } = useAuth();
+  const { hasApiKey, checkAuth, clearKey } = useAuth();
 
   // -- State: Persistence Enabled (using hook) --
   const [tasks, setTasks] = usePersistentState<Task[]>('hud_tasks', MOCK_TASKS);
@@ -441,6 +442,7 @@ export const HudProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       focusWindow,
       resetLayout,
       checkAuth,
+      clearKey,
       getSyntheticLayout
     }}>
       {children}
