@@ -233,6 +233,14 @@ const DitherTool: React.FC<DitherToolProps> = ({
     }
   }, [loadImage]);
 
+  const updateSetting = <K extends keyof DitherSettings>(key: K, value: DitherSettings[K]) => {
+    setSettings(prev => {
+      const next = { ...prev, [key]: value };
+      onSettingsChange?.(next);
+      return next;
+    });
+  };
+
   const handleReset = () => {
     setSettings({
       pixelSize: 4,
@@ -277,35 +285,93 @@ const DitherTool: React.FC<DitherToolProps> = ({
       </div>
 
       {/* Controls */}
-      <div className="shrink-0 border-t border-neutral-800 bg-neutral-900/50 p-3">
-        <div className="flex items-center gap-4 text-[10px]">
-          <div className="flex items-center gap-2">
-            <span className="text-neutral-500 uppercase">Pixels</span>
-            <span className="text-neutral-300 w-6">{settings.pixelSize}</span>
+      <div className="shrink-0 border-t border-neutral-800 bg-neutral-900/50 p-3 flex flex-col gap-2">
+        {/* Row 1: Pixel size slider + actions */}
+        <div className="flex items-center gap-3 text-[10px]">
+          <span className="text-neutral-500 uppercase w-10 shrink-0">Pixels</span>
+          <input
+            type="range"
+            min={1}
+            max={16}
+            value={settings.pixelSize}
+            onChange={(e) => updateSetting('pixelSize', Number(e.target.value))}
+            className="flex-1 h-1 accent-emerald-500 bg-neutral-800 rounded-full cursor-pointer"
+          />
+          <span className="text-neutral-300 font-mono w-4 text-right">{settings.pixelSize}</span>
+          <div className="flex items-center gap-1 ml-2">
+            <label className="p-1.5 hover:bg-white/10 rounded text-neutral-500 hover:text-emerald-400 transition-colors cursor-pointer" title="Upload image">
+              <Upload size={12} />
+              <input type="file" accept="image/*" className="hidden" onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) {
+                  const reader = new FileReader();
+                  reader.onload = (ev) => { if (ev.target?.result) loadImage(ev.target.result as string); };
+                  reader.readAsDataURL(file);
+                }
+              }} />
+            </label>
+            <button onClick={handleReset} className="p-1.5 hover:bg-white/10 rounded text-neutral-500 hover:text-white transition-colors" title="Reset">
+              <RotateCcw size={12} />
+            </button>
+            <button onClick={handleDownload} className="p-1.5 hover:bg-white/10 rounded text-neutral-500 hover:text-white transition-colors" title="Download">
+              <Download size={12} />
+            </button>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-neutral-500 uppercase">Palette</span>
-            <span className="text-neutral-300 capitalize">{settings.palette}</span>
+        </div>
+
+        {/* Row 2: Palette + Algorithm selectors */}
+        <div className="flex items-center gap-3 text-[10px]">
+          <span className="text-neutral-500 uppercase w-10 shrink-0">Palette</span>
+          <div className="flex gap-1">
+            {(['grayscale', 'gameboy', 'cga', 'sepia', 'cyber'] as const).map(p => (
+              <button
+                key={p}
+                onClick={() => updateSetting('palette', p)}
+                className={`px-1.5 py-0.5 rounded text-[9px] transition-colors ${settings.palette === p ? 'bg-emerald-500/20 text-emerald-400' : 'text-neutral-500 hover:text-white hover:bg-white/5'}`}
+              >
+                {p}
+              </button>
+            ))}
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-neutral-500 uppercase">Algorithm</span>
-            <span className="text-neutral-300 capitalize">{settings.algorithm}</span>
+        </div>
+
+        <div className="flex items-center gap-3 text-[10px]">
+          <span className="text-neutral-500 uppercase w-10 shrink-0">Algo</span>
+          <div className="flex gap-1">
+            {(['ordered', 'floyd-steinberg', 'atkinson', 'none'] as const).map(a => (
+              <button
+                key={a}
+                onClick={() => updateSetting('algorithm', a)}
+                className={`px-1.5 py-0.5 rounded text-[9px] transition-colors ${settings.algorithm === a ? 'bg-emerald-500/20 text-emerald-400' : 'text-neutral-500 hover:text-white hover:bg-white/5'}`}
+              >
+                {a}
+              </button>
+            ))}
           </div>
-          <div className="flex-1" />
-          <button
-            onClick={handleReset}
-            className="p-1.5 hover:bg-white/10 rounded text-neutral-500 hover:text-white transition-colors"
-            title="Reset settings"
-          >
-            <RotateCcw size={12} />
-          </button>
-          <button
-            onClick={handleDownload}
-            className="p-1.5 hover:bg-white/10 rounded text-neutral-500 hover:text-white transition-colors"
-            title="Download image"
-          >
-            <Download size={12} />
-          </button>
+        </div>
+
+        {/* Row 3: Contrast + Brightness */}
+        <div className="flex items-center gap-3 text-[10px]">
+          <span className="text-neutral-500 uppercase w-10 shrink-0">Ctrst</span>
+          <input
+            type="range"
+            min={0.5}
+            max={2}
+            step={0.1}
+            value={settings.contrast}
+            onChange={(e) => updateSetting('contrast', Number(e.target.value))}
+            className="flex-1 h-1 accent-emerald-500 bg-neutral-800 rounded-full cursor-pointer"
+          />
+          <span className="text-neutral-500 uppercase w-10 shrink-0 ml-2">Bright</span>
+          <input
+            type="range"
+            min={-0.5}
+            max={0.5}
+            step={0.05}
+            value={settings.brightness}
+            onChange={(e) => updateSetting('brightness', Number(e.target.value))}
+            className="flex-1 h-1 accent-emerald-500 bg-neutral-800 rounded-full cursor-pointer"
+          />
         </div>
       </div>
     </div>

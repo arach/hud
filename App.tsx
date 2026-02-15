@@ -842,6 +842,7 @@ Alex`
                   tags: []
               };
               addWindow(newWindow);
+              setTimeout(() => handleFocusWindow(newWindow.id), 50);
               return { result: `Created ${args.type} window: ${newWindow.id}` };
           }
           case 'close_window': {
