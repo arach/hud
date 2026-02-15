@@ -1306,9 +1306,9 @@ CURRENT HUD ENVIRONMENT:
                       onResize={handleWindowResize}
                       onSelect={handleWindowSelect}
                       onClose={closeWindow}
-                      className={'bg-[#0a0a0a] border border-neutral-600 backdrop-blur-md ring-1 ring-white/[0.04] flex flex-col'}
+                      className={'bg-black border border-neutral-600 ring-1 ring-white/[0.04] flex flex-col'}
                   >
-                      <div className="h-7 bg-neutral-900/90 border-b border-neutral-700 flex items-center justify-center px-2 select-none shrink-0 relative">
+                      <div className="h-7 bg-neutral-900 border-b border-neutral-700 flex items-center justify-center px-2 select-none shrink-0 relative">
                           <span className="text-[10px] font-bold tracking-widest text-neutral-400 uppercase">{win.title}</span>
                           <div className="absolute right-2 flex gap-1 group">
                               <div 

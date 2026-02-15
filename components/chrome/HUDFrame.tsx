@@ -99,15 +99,15 @@ const HUDFrame: React.FC<HUDFrameProps> = ({
       />
       
       {/* Background Depth/Blur Layer for Scopes */}
-      <div 
+      <div
         className={`absolute inset-0 pointer-events-none transition-all duration-700 ease-in-out z-0
-            ${activeContextId !== 'global' ? 'backdrop-blur-md bg-black/60' : 'backdrop-blur-0 bg-black/0'}
+            ${activeContextId !== 'global' ? 'backdrop-blur-2xl bg-black/40' : 'backdrop-blur-0 bg-black/0'}
         `}
       />
 
       {/* Filter Backdrop Layer */}
       {filterActive && (
-        <div className="absolute inset-0 pointer-events-none z-[5] bg-black/35"></div>
+        <div className="absolute inset-0 pointer-events-none z-[5] backdrop-blur-xl bg-black/25"></div>
       )}
       
       {/* World Content Layer - Scaled */}

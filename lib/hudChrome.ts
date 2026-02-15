@@ -7,8 +7,8 @@ export const HUD_CHROME = {
   // Stronger blur than current md
   blur: 'backdrop-blur-xl',
 
-  // Semi-transparent dark background
-  bg: 'bg-black/85',
+  // Near-opaque dark background
+  bg: 'bg-black/95',
 
   // Border with subtle definition
   border: 'border border-neutral-800/80',
