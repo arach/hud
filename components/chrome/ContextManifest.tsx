@@ -558,38 +558,42 @@ const ContextManifest: React.FC<ContextManifestProps> = ({
               <div className="flex flex-col gap-1">
                 {([
                   { id: 'spatial' as ViewMode, label: 'Spatial', icon: <Compass size={14} />, color: '#ffffff' },
-                  { id: 'terminals' as ViewMode, label: 'Terminals', icon: <TerminalSquare size={14} />, color: '#f59e0b' },
-                  { id: 'editors' as ViewMode, label: 'Editors', icon: <FileCode size={14} />, color: '#10b981' },
-                  { id: 'visuals' as ViewMode, label: 'Visuals', icon: <LayoutGrid size={14} />, color: '#3b82f6' },
-                ]).map((mode) => {
+                  { id: 'terminals' as ViewMode, label: 'Terminals', icon: <TerminalSquare size={14} />, color: '#f59e0b', types: ['terminal'] },
+                  { id: 'editors' as ViewMode, label: 'Editors', icon: <FileCode size={14} />, color: '#10b981', types: ['editor'] },
+                  { id: 'visuals' as ViewMode, label: 'Visuals', icon: <LayoutGrid size={14} />, color: '#3b82f6', types: ['visual'] },
+                ] as const).map((mode) => {
                   const isActive = activeView === mode.id;
-                  const threadCount = mode.id === 'spatial'
-                    ? activeThreads.length
-                    : activeThreads.filter(t => t.isActive).length;
-                  const hasActivity = threadCount > 0 && mode.id !== 'spatial';
+                  const count = mode.id === 'spatial'
+                    ? windows.length
+                    : windows.filter(w => ('types' in mode) && (mode as any).types.includes(w.type)).length;
+                  const isEmpty = mode.id !== 'spatial' && count === 0;
 
                   return (
                     <button
                       key={mode.id}
-                      onClick={() => onSelectView(mode.id)}
+                      onClick={() => !isEmpty && onSelectView(mode.id)}
                       className={`
                         flex items-center gap-3 px-3 py-2 rounded-lg text-[11px] font-bold tracking-wide transition-all duration-200 w-full text-left
-                        ${isActive
-                          ? 'bg-white/10 text-white'
-                          : 'text-neutral-500 hover:text-white hover:bg-white/5'}
+                        ${isEmpty
+                          ? 'text-neutral-700 cursor-default'
+                          : isActive
+                            ? 'bg-white/10 text-white'
+                            : 'text-neutral-500 hover:text-white hover:bg-white/5'}
                       `}
                     >
                       <span
                         className="w-5 h-5 flex items-center justify-center rounded"
-                        style={{ color: isActive ? mode.color : undefined }}
+                        style={{ color: isActive ? mode.color : isEmpty ? 'rgb(55,55,55)' : undefined }}
                       >
                         {mode.icon}
                       </span>
                       <span className="flex-1">{mode.label}</span>
-                      {hasActivity && (
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                      {mode.id !== 'spatial' && (
+                        <span className={`text-[9px] font-mono ${isEmpty ? 'text-neutral-700' : isActive ? 'text-neutral-400' : 'text-neutral-600'}`}>
+                          {count}
+                        </span>
                       )}
-                      {isActive && (
+                      {isActive && !isEmpty && (
                         <span className="text-[8px] text-neutral-500 font-normal">ACTIVE</span>
                       )}
                     </button>

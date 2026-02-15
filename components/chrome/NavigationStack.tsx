@@ -32,10 +32,10 @@ const NavigationStack: React.FC<NavigationStackProps> = ({
         {/* Top highlight line */}
         <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-white/5 to-transparent" />
 
-        {/* LEFT: Branding */}
+        {/* LEFT: Branding — absolute so it doesn't shift center tabs */}
         <button
           onClick={onResetToGlobal}
-          className="group flex items-baseline gap-0 shrink-0 select-none cursor-pointer bg-transparent border-none"
+          className="absolute left-4 top-0 bottom-0 z-10 group flex items-center gap-0 select-none cursor-pointer bg-transparent border-none"
           title="Reset to Global View"
         >
           <span className="text-[22px] font-bold text-white tracking-[0.25em] font-mono leading-none">
@@ -51,9 +51,6 @@ const NavigationStack: React.FC<NavigationStackProps> = ({
             <em className="text-[17px] text-white leading-none whitespace-nowrap">@arach</em>
           </span>
         </button>
-
-        {/* Divider */}
-        <div className="w-px h-6 bg-neutral-800 mx-4" />
 
         {/* CENTER: Context Tabs */}
         <div className="flex-1 flex justify-center">

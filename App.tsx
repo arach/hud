@@ -556,16 +556,30 @@ Alex`
       setPendingContextFocusId(ctx.id);
   }, [setActiveContextId, setActiveView]);
 
-  // Canvas click handler - zooms into nearest context zone when in overview mode
+  // Canvas click handler
+  // - Overview mode: zoom into nearest context zone
+  // - Normal mode: deselect current focus (stay in place)
   const handleCanvasClick = useCallback((e: React.MouseEvent) => {
-    if (!isOverviewMode) return;
-
-    const nearest = findNearestContext(e.clientX, e.clientY);
-    if (nearest) {
-      setIsOverviewMode(false);
-      handleContextSelect(nearest);
+    if (isOverviewMode) {
+      const nearest = findNearestContext(e.clientX, e.clientY);
+      if (nearest) {
+        setIsOverviewMode(false);
+        handleContextSelect(nearest);
+      }
+      return;
     }
-  }, [isOverviewMode, findNearestContext, handleContextSelect]);
+
+    // Only deselect if something is actually selected
+    const hasSelection = selectedWindowId || selectedContextId || selectedFilter || activeView !== 'spatial';
+    if (hasSelection) {
+      setSelectedWindowId(null);
+      setSelectedContextId(null);
+      setSelectedFilter(null);
+      if (activeView !== 'spatial') {
+        setActiveView('spatial');
+      }
+    }
+  }, [isOverviewMode, findNearestContext, handleContextSelect, activeView, setActiveView, selectedWindowId, selectedContextId, selectedFilter]);
 
   const handleAutoLayout = useCallback(() => {
     resetLayout();
@@ -1031,6 +1045,9 @@ CURRENT HUD ENVIRONMENT:
   const isFilterActive = isScoped || activeView !== 'spatial';
   const canRestoreDefaults = activeContextId !== 'global';
   const isScopeEmpty = isScoped && scopedWindows.length === 0;
+  const viewTypeMap: Record<string, string[]> = { terminals: ['terminal'], editors: ['editor'], visuals: ['visual'] };
+  const viewWindowCount = activeView === 'spatial' ? scopedWindows.length : scopedWindows.filter(w => viewTypeMap[activeView]?.includes(w.type)).length;
+  const isViewEmpty = activeView !== 'spatial' && viewWindowCount === 0;
   const shouldShowZones = !isPanActive && !isPanSettling;
   const visibleZones = useMemo(() => {
     if (activeView !== 'spatial') return [];
@@ -1165,10 +1182,11 @@ CURRENT HUD ENVIRONMENT:
               onZoomOut={() => setScale(s => Math.max(0.2, s - 0.2))}
             />
 
-            {/* Voice Control - floating on canvas top-right */}
+            {/* Canvas Toolbar - floating top-right: voice, cmd palette, help */}
             <VoiceControl
               isConnected={isVoiceConnected}
               onToggle={toggleVoice}
+              onOpenCommandPalette={() => { pop(); setIsCmdPaletteOpen(true); }}
             />
 
             {!isCompactMode && (
@@ -1225,26 +1243,21 @@ CURRENT HUD ENVIRONMENT:
                 onClose={() => setShowWelcome(false)}
             />
 
-            {isScopeEmpty && (
+            {(isScopeEmpty || isViewEmpty) && (
                 <div className="fixed inset-0 flex items-center justify-center z-40 pointer-events-none">
-                    <div className="bg-black/80 backdrop-blur-xl border border-neutral-800 p-8 rounded-2xl flex flex-col items-center gap-4 animate-in zoom-in-95 fade-in duration-500 pointer-events-auto shadow-[0_0_50px_rgba(0,0,0,0.8)]">
-                        <div className="w-16 h-16 rounded-full bg-neutral-900 border border-neutral-800 flex items-center justify-center mb-2 shadow-inner">
-                            <Power size={24} className="text-neutral-500" />
-                        </div>
-                        <div className="text-center">
-                            <h2 className="text-xl font-bold text-white tracking-tight mb-1">System Offline</h2>
-                            <p className="text-neutral-400 text-xs font-mono max-w-[200px]">
-                                No active modules found for <span className="text-emerald-500">{namespaceQuery}</span>.
-                            </p>
-                        </div>
-                        {canRestoreDefaults && (
-                            <button 
-                                onClick={() => restoreContextDefaults(activeContextId)}
-                                className="px-6 py-2 bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-sm tracking-wide rounded-full transition-all hover:scale-105 shadow-[0_0_20px_rgba(16,185,129,0.3)] mt-2"
-                            >
-                                Initialize Protocol
-                            </button>
-                        )}
+                    <div className="bg-black/80 backdrop-blur-xl border border-neutral-800 p-6 rounded-xl flex flex-col items-center gap-3 animate-in zoom-in-95 fade-in duration-500 pointer-events-auto shadow-[0_0_50px_rgba(0,0,0,0.8)]">
+                        <p className="text-neutral-400 text-[11px] font-mono max-w-[240px] text-center leading-relaxed">
+                            {isViewEmpty
+                              ? <>No <span className="text-white font-bold">{activeView}</span> in <span className="text-white font-bold">{contexts.find(c => c.id === activeContextId)?.label || 'this context'}</span></>
+                              : <>No modules matching <span className="text-emerald-500">{namespaceQuery}</span></>
+                            }
+                        </p>
+                        <button
+                            onClick={() => { setActiveView('spatial'); }}
+                            className="px-4 py-1.5 text-[10px] font-bold tracking-wide text-neutral-400 hover:text-white border border-neutral-700 hover:border-neutral-500 rounded-full transition-all"
+                        >
+                            Back to Spatial
+                        </button>
                     </div>
                 </div>
             )}

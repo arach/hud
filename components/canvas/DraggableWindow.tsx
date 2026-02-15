@@ -135,7 +135,7 @@ const DraggableWindow: React.FC<DraggableWindowProps> = ({
           : isSelected
             ? '0 0 40px rgba(16,185,129,0.08), 0 0 12px rgba(16,185,129,0.05), 0 8px 32px rgba(0,0,0,0.7)'
             : '0 0 25px rgba(255,255,255,0.025), 0 8px 32px rgba(0,0,0,0.6)',
-        transition: 'all 0.5s cubic-bezier(0.2, 0.8, 0.2, 1)',
+        transition: isDragging || isResizing ? 'none' : 'all 0.5s cubic-bezier(0.2, 0.8, 0.2, 1)',
         pointerEvents: isDimmed ? 'none' : 'auto'
       }}
       className={`
@@ -143,7 +143,8 @@ const DraggableWindow: React.FC<DraggableWindowProps> = ({
         ${isDragging ? 'cursor-grabbing' : 'cursor-default'}
         ${className}
       `}
-      onMouseDown={handleContentMouseDown} 
+      onMouseDown={handleContentMouseDown}
+      onClick={(e) => e.stopPropagation()}
     >
       {/* Selection Border / Glow */}
       <div className={`absolute -inset-[3px] pointer-events-none transition-all duration-300 ${isSelected && !isDimmed ? 'opacity-100' : 'opacity-0'}`}>
