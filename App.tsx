@@ -31,6 +31,7 @@ import {
 
 // Shared components (reusable UI)
 import { ChatInterface, TaskManager } from './components/shared';
+import { GoogleAnalytics } from './components/GoogleAnalytics';
 
 // Tool registry and types
 import { getToolComponent } from './components/tools/registry';
@@ -185,6 +186,7 @@ Alex`
     resetLayout,
     checkAuth,
     clearKey,
+    clearMessages,
     getSyntheticLayout,
     addLocalMessage
   } = useHud();
@@ -1037,12 +1039,19 @@ CURRENT HUD ENVIRONMENT:
         addLocalMessage('system', `AVAILABLE COMMANDS
 
   /help              show this message
+  /clear             clear chat history
   /clear-key         remove stored API key
   /sounds            list sound engine controls
   /sounds play <n>   preview a sound
   /sounds on|off     mute/unmute UI sounds
 
 Or just type naturally to talk to HUD.`);
+        return;
+      }
+
+      // /clear — clear chat history
+      if (trimmed === '/clear') {
+        clearMessages();
         return;
       }
 
@@ -1242,6 +1251,7 @@ Or just type naturally to talk to HUD.`);
 
   return (
     <>
+      <GoogleAnalytics />
       <HUDFrame
         panOffset={panOffset}
         scale={scale}
